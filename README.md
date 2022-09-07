@@ -18,3 +18,7 @@ options style, meaning all the options will automatically be exercised at
 expiry. A holder can redeem the proceeds, the protocol will pay the holder the
 value based on strike price and underlying spot price at expiry, instead of
 actually exchanging the underlying asset.
+
+
+https://user-images.githubusercontent.com/110339488/188859834-aa63a1d3-fecd-4db4-a2e4-157b6a535969.mp4
+
