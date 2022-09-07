@@ -183,6 +183,65 @@ namespace Options {
 
         return ();
     }
+
+    //
+    // Option instance methods
+    //
+
+    func write_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            nonce: felt, writer_address: felt, buyer_address: felt, premium: felt,
+        ) {
+        alloc_locals;
+
+        let (optio_address: felt) = optio_address.read();
+        let (pool_address: felt) = pool_address.read(nonce);
+        let (offer: Offer) = offers.read(nonce);
+
+        with_attr error_message("write_option: writer's addresses don't match") {
+            assert writer_address = offer.writer_address;
+        }
+
+        let (transactions: felt*) = alloc();
+        assert transactions[0] = Transaction();
+        assert transactions[1] = Transaction();
+
+        let (succeed: felt) = IOptio.transferFrom(
+            contract_address=optio_address,
+            _from=writer_address,
+            _to=pool_address,
+            _transactions_length=1,
+            _transactions=transactions,
+        );
+
+        with_attr error_message("write_option: collateral transfer failed") {
+            assert succeed = TRUE;
+        }
+
+        let (current_timestamp) = get_block_timestamp();
+        let option = Option(
+            nonce=nonce,
+            strike=offer.strike,
+            amount=offer.amount,
+            expiration=current_timestamp + offer.expiration,
+            premium=premium,
+            writer=writer_address,
+            buyer=buyer_address,
+            is_active=TRUE,
+        );
+        options.write(nonce, option);
+        let offer = Offer(
+            nonce=nonce,
+            strike=strike,
+            amount=amount,
+            expiration=expiration,
+            writer_address=caller_address,
+            is_matched=TRUE,
+            is_active=FALSE,
+        );
+        offers.write(nonce, offer);
+
+        return ();
+    }
 }
 
 // Helpers
