@@ -45,3 +45,46 @@ struct Option {
     buyer_address: felt,
     is_active: felt,
 }
+
+@storage_var
+func optio_address() -> (optio_address: felt) {
+}
+
+@storage_var
+func pool_address() -> (pool_address: felt) {
+}
+
+@storage_var
+func class() -> (class_id: felt) {
+}
+
+@storage_var
+func nonce() -> (nonce: felt) {
+}
+
+@storage_var
+func offers(nonce: felt) -> (offer: Offer) {
+}
+
+@storage_var
+func options(nonce: felt) -> (option: Option) {
+}
+
+// Helpers
+
+func get_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (nonce: felt) {
+    let (nonce: felt) = nonce.read();
+    return (nonce);
+}
+
+func update_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(nonce: felt) -> () {
+    nonce.write(nonce);
+    return ();
+}
+
+func create_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (nonce: felt) {
+    let (nonce: felt) = get_nonce();
+    tempvar nonce_id = nonce + 1;
+    update_nonce(nonce_id);
+    return (nonce_id);
+}
