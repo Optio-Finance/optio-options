@@ -35,3 +35,19 @@ func cancelOffer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     Options.create_offer(nonce);
     return ();
 }
+
+@external
+func writeOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        nonce: felt, writer_address: felt, buyer_address: felt, fee: felt,
+    ) {
+    Options.write_option(nonce, writer_address, buyer_address);
+    return ();
+}
+
+@external
+func redeemOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        nonce: felt
+    ) {
+    Options.redeem_option(nonce);
+    return ();
+}
