@@ -242,6 +242,70 @@ namespace Options {
 
         return ();
     }
+
+    // @notice In case if expired by not exercised
+    func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            nonce: felt
+        ) {
+        alloc_locals;
+
+        let (option: Option) = options.read(nonce);
+        let (current_timestamp: felt) = get_block_timestamp();
+
+        with_attr error_message("redeem_option: option has been set inactive") {
+            assert option.is_active = TRUE;
+        }
+        with_attr error_message("redeem_option: option is not expired yet") {
+            // @dev Option expiration date + 1 day for exercising
+            assert_lt(option.expiration + 86400, current_timestamp);
+        }
+
+        let (caller_address: felt) = get_caller_address();
+
+        with_attr error_message("redeem_option: writer only") {
+            assert caller_address = option.writer;
+        }
+
+        ReentrancyGuard.start(nonce);
+
+        let (optio_address: felt) = optio_address.read();
+        let (redeem_succeed: felt) = IOptio.transferFrom(
+            contract_address=optio_address,
+            _from=pool_address,
+            to=caller_address,
+        );
+
+        if (redeem_succeed == TRUE) {
+            let (option: Option) = Option(
+                class_id=option.class_id,
+                unit_id=option.unit_id,
+                nonce=nonce,
+                strike=option.strike,
+                amount=option.amount,
+                expiration=option.expiration,
+                premium=option.premium,
+                writer=optionwriter_address,
+                buyer=optionbuyer_address,
+                is_active=FALSE,
+            );
+            options.write(nonce, option);
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+
+        ReentrancyGuard.finish(nonce);
+
+        with_attr error_message("redeem_option: transferFrom failed") {
+            assert redeem_succeed = TRUE;
+        }
+
+        return ();
+    }
 }
 
 // Helpers
