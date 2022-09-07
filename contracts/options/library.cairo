@@ -70,6 +70,121 @@ func offers(nonce: felt) -> (offer: Offer) {
 func options(nonce: felt) -> (option: Option) {
 }
 
+
+namespace Options {
+    //
+    /// Constructor
+    //
+    func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            optio_address: felt, class_id: felt, pool_address: felt,
+        ) {
+        optio_address.write(optio_address);
+        pool_address.write(pool_address);
+        class.write(class_id);
+        return ();
+    }
+
+    //
+    // Asks (offers)
+    //
+
+    func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        strike: felt, amount: felt, expiration: felt,
+    ) {
+        alloc_locals;
+
+        let (nonce: felt) = create_nonce();
+        let (current_timestamp: felt) = get_block_timestamp();
+
+        with_attr error_message("create_offer: details could not be zeros") {
+            assert_not_zero(strike);
+            assert_not_zero(amount);
+            assert_not_zero(expiration);
+        }
+
+        let (caller_address: felt) = get_caller_address();
+        let (optio_address: felt) = optio_address.read();
+
+        let (collateral_put: felt) = IOptio.transferFrom(
+            contract_address=optio_address,
+            _from=caller_address,
+            to=pool_address,
+        );
+
+        with_attr error_message("create_offer: details could not be zeros") {
+            collateral_put = TRUE;
+        }
+
+        let offer = Offer(
+            nonce=nonce,
+            strike=strike,
+            amount=amount,
+            expiration=expiration,
+            writer_address=caller_address,
+            is_matched=FALSE,
+            is_active=TRUE,
+        );
+        offers.write(nonce, offer);
+
+        return ();
+    }
+
+    func cancel_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            nonce: felt
+        ) {
+        alloc_locals;
+
+        let (offer: Offer) = offers.read(nonce);
+        let (pool_address: felt) = pool_address.read(nonce);
+        let (caller_address: felt) = get_caller_address();
+
+        with_attr error_message("cancel_offer: only writer can cancel") {
+            assert caller_address = offer.writer;
+        }
+
+        with_attr error_message("cancel_offer: offer is no longer active") {
+            assert offer.is_active = TRUE;
+        }
+
+        ReentrancyGuard.start(nonce);
+
+        let (optio_address: felt) = optio_address.read();
+        let (refund_succeed: felt) = IOptio.transferFrom(
+            contract_address=optio_address,
+            _from=pool_address,
+            to=caller_address,
+        );
+
+        if (refund_succeed == TRUE) {
+            let offer = Offer(
+                nonce=nonce,
+                strike=offer.strike,
+                amount=offer.amount,
+                expiration=offer.expiration,
+                writer_address=offer.writer_address,
+                is_matched=TRUE,
+                is_active=FALSE,
+            );
+            offers.write(nonce, offer);
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+
+        ReentrancyGuard.finish(nonce);
+
+        with_attr error_message("cancel_offer: refund failed, state wasn't updated") {
+            assert refund_succeed = TRUE;
+        }
+
+        return ();
+    }
+}
+
 // Helpers
 
 func get_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (nonce: felt) {
