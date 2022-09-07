@@ -306,6 +306,74 @@ namespace Options {
 
         return ();
     }
+
+    func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            nonce: felt
+        ) {
+        alloc_locals;
+
+        let (option: Option) = options.read(nonce);
+        let (caller_address: felt) = get_caller_address();
+
+        with_attr error_message("exercise_option: expected buyer={option}, got={caller}") {
+            assert caller_address = option.buyer_address;
+        }
+
+        with_attr error_message("exercise_option: option is not active") {
+            assert option.is_active = TRUE;
+        }
+        
+        // TODO oracle implementation
+        // @dev returned price should be in felt
+
+        ReentrancyGuard.start(nonce);
+
+        let (optio_address: felt) = optio_address.read();
+        let (pool_address: felt) = pool_address.read();
+
+        let (transactions: felt*) = alloc();
+        assert transactions[0] = Transaction();
+        assert transactions[1] = Transaction();
+
+        let (payout_succeed: felt) = IOptio.transferFrom(
+            contract_address=optio_address,
+            _from=pool_address,
+            _to=caller_address,
+            _transactions_length=2,
+            _transactions=transactions,
+        );
+
+        if (payout_succeed == TRUE) {
+            let (option: Option) = Option(
+                class_id=option.class_id,
+                unit_id=option.unit_id,
+                nonce=nonce,
+                strike=option.strike,
+                amount=option.amount,
+                expiration=option.expiration,
+                premium=option.premium,
+                writer_address=option.writer_address,
+                buyer_address=option.buyer_address,
+                is_active=FALSE,
+            );
+            options.write(nonce, option);
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+
+        ReentrancyGuard.finish(nonce);
+
+        with_attr error_message("exercise_option: payout failed") {
+            payout_succeed = TRUE;
+        }
+
+        return ();
+    }
 }
 
 // Helpers
