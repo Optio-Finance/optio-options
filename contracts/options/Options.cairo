@@ -51,3 +51,11 @@ func redeemOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     Options.redeem_option(nonce);
     return ();
 }
+
+@external
+func exerciseOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        nonce: felt
+    ) {
+    Options.exercise_option(nonce);
+    return ();
+}
