@@ -11,7 +11,7 @@ namespace ReentrancyGuard {
     func start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         nonce: felt
     ) {
-        let (has_entered) = ReentrancyGuard_entered.read();
+        let (has_entered) = ReentrancyGuard_entered.read(nonce);
         with_attr error_message("ReentrancyGuard: reentrant call") {
             assert has_entered = FALSE;
         }
