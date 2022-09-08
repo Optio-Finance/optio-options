@@ -106,7 +106,7 @@ namespace Options {
 
         let (caller_address: felt) = get_caller_address();
         let (optio_address_value: felt) = optio_address.read();
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (pool_address_value: felt) = pool_address.read();
 
         let (collateral_put: felt) = IOptio.transferFrom(
             contract_address=optio_address_value,
@@ -138,7 +138,7 @@ namespace Options {
         alloc_locals;
 
         let (offer: Offer) = offers.read(nonce);
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (pool_address_value: felt) = pool_address.read();
         let (caller_address: felt) = get_caller_address();
 
         with_attr error_message("cancel_offer: only writer can cancel") {
@@ -197,7 +197,7 @@ namespace Options {
         alloc_locals;
 
         let (optio_address_value: felt) = optio_address.read();
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (pool_address_value: felt) = pool_address.read();
         let (offer: Offer) = offers.read(nonce);
 
         with_attr error_message("write_option: writer's addresses don't match") {
@@ -272,7 +272,7 @@ namespace Options {
         ReentrancyGuard.start(nonce);
 
         let (optio_address_value: felt) = optio_address.read();
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (pool_address_value: felt) = pool_address.read();
         let (redeem_succeed: felt) = IOptio.transferFrom(
             contract_address=optio_address_value,
             sender=pool_address_value,
