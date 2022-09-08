@@ -110,8 +110,8 @@ namespace Options {
 
         let (collateral_put: felt) = IOptio.transferFrom(
             contract_address=optio_address_value,
-            _from=caller_address,
-            to=pool_address_value,
+            sender=caller_address,
+            recipient=pool_address_value,
         );
 
         with_attr error_message("create_offer: details could not be zeros") {
@@ -154,8 +154,8 @@ namespace Options {
         let (optio_address_value: felt) = optio_address.read();
         let (refund_succeed: felt) = IOptio.transferFrom(
             contract_address=optio_address_value,
-            _from=pool_address_value,
-            to=caller_address,
+            sender=pool_address_value,
+            recipient=caller_address,
         );
 
         if (refund_succeed == TRUE) {
@@ -210,10 +210,10 @@ namespace Options {
 
         let (succeed: felt) = IOptio.transferFrom(
             contract_address=optio_address_value,
-            _from=writer_address,
-            _to=pool_address_value,
-            _transactions_length=1,
-            _transactions=transactions,
+            sender=writer_address,
+            recipient=pool_address_value,
+            transactions_len=1,
+            transactions=transactions,
         );
 
         with_attr error_message("write_option: collateral transfer failed") {
@@ -275,8 +275,8 @@ namespace Options {
         let (pool_address_value: felt) = pool_address.read(nonce);
         let (redeem_succeed: felt) = IOptio.transferFrom(
             contract_address=optio_address_value,
-            _from=pool_address_value,
-            to=caller_address,
+            sender=pool_address_value,
+            recipient=caller_address,
         );
 
         if (redeem_succeed == TRUE) {
@@ -341,10 +341,10 @@ namespace Options {
 
         let (payout_succeed: felt) = IOptio.transferFrom(
             contract_address=optio_address_value,
-            _from=pool_address_value,
-            _to=caller_address,
-            _transactions_length=2,
-            _transactions=transactions,
+            sender=pool_address_value,
+            recipient=caller_address,
+            transactions_len=2,
+            transactions=transactions,
         );
 
         if (payout_succeed == TRUE) {
