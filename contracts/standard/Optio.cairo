@@ -17,19 +17,19 @@ from contracts.standard.library import OPTIO
 //
 
 @event
-func Transfer(caller: felt, _from: felt, _to: felt, _transactions_len: felt, _transactions: felt*) {
+func Transfer(caller: felt, sender: felt, recipient: felt, transactions_len: felt, transactions: felt*) {
 }
 
 @event
-func Issue(caller: felt, _to: felt, _transactions_len: felt, _transactions: felt*) {
+func Issue(caller: felt, recipient: felt, transactions_len: felt, transactions: felt*) {
 }
 
 @event
-func Redeem(caller: felt, _from: felt, _transactions_len: felt, _transactions: felt*) {
+func Redeem(caller: felt, sender: felt, transactions_len: felt, transactions: felt*) {
 }
 
 @event
-func Burn(caller: felt, _from: felt, _transactions_len: felt, _transactions: felt*) {
+func Burn(caller: felt, sender: felt, transactions_len: felt, transactions: felt*) {
 }
 
 @event
@@ -37,7 +37,7 @@ func ApprovalFor(caller: felt, operator: felt, approved: felt) {
 }
 
 //
-// # Constructor
+/// Constructor
 //
 
 @constructor
@@ -54,117 +54,117 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func transferFrom{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    _from: felt, _to: felt, _transactions_len: felt, _transactions: Transaction*
+    sender: felt, recipient: felt, transactions_len: felt, transactions: Transaction*
 ) {
     alloc_locals;
-    with_attr error_message("transferFrom: can't transfer from zero address, got _from={_from}") {
-        assert_not_zero(_from);
+    with_attr error_message("transferFrom: can't transfer from zero address, got sender={sender}") {
+        assert_not_zero(sender);
     }
 
-    with_attr error_message("transferFrom: use burn() instead, got _to={_to}") {
-        assert_not_zero(_to);
+    with_attr error_message("transferFrom: use burn() instead, got recipient={recipient}") {
+        assert_not_zero(recipient);
     }
 
     let (local caller) = get_caller_address();
     OPTIO.transfer_from(
-        sender=_from,
-        recipient=_to,
+        sender=sender,
+        recipient=recipient,
         transaction_index=0,
-        transactions_len=_transactions_len,
-        transactions=_transactions,
+        transactions_len=transactions_len,
+        transactions=transactions,
     );
-    Transfer.emit(caller, _from, _to, _transactions_len, _transactions);
+    Transfer.emit(caller, sender, recipient, transactions_len, transactions);
 
     return ();
 }
 
 @external
 func transferAllowanceFrom{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    _from: felt, _to: felt, _transactions_len: felt, _transactions: Transaction*
+    sender: felt, recipient: felt, transactions_len: felt, transactions: Transaction*
 ) {
     alloc_locals;
     with_attr error_message(
-            "transferAllowanceFrom: can't transfer allowance from zero address, got _from={_from}") {
-        assert_not_zero(_from);
+            "transferAllowanceFrom: can't transfer allowance from zero address, got sender={sender}") {
+        assert_not_zero(sender);
     }
 
-    with_attr error_message("transferAllowanceFrom: use burn() instead, got _to={_to}") {
-        assert_not_zero(_to);
+    with_attr error_message("transferAllowanceFrom: use burn() instead, got recipient={recipient}") {
+        assert_not_zero(recipient);
     }
 
     let (local caller) = get_caller_address();
     OPTIO.transfer_allowance_from(
         caller=caller,
-        sender=_from,
-        recipient=_to,
+        sender=sender,
+        recipient=recipient,
         transaction_index=0,
-        transactions_len=_transactions_len,
-        transactions=_transactions,
+        transactions_len=transactions_len,
+        transactions=transactions,
     );
-    Transfer.emit(caller, _from, _to, _transactions_len, _transactions);
+    Transfer.emit(caller, sender, recipient, transactions_len, transactions);
 
     return ();
 }
 
 @external
 func issue{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    _to: felt, _transactions_len: felt, _transactions: Transaction*
+    recipient: felt, transactions_len: felt, transactions: Transaction*
 ) {
     alloc_locals;
-    with_attr error_message("issue: can't issue to zero address, got _to={_to}") {
-        assert_not_zero(_to);
+    with_attr error_message("issue: can't issue to zero address, got recipient={recipient}") {
+        assert_not_zero(recipient);
     }
 
     OPTIO.issue(
-        recipient=_to,
+        recipient=recipient,
         transaction_index=0,
-        transactions_len=_transactions_len,
-        transactions=_transactions,
+        transactions_len=transactions_len,
+        transactions=transactions,
     );
     let (caller) = get_caller_address();
-    Issue.emit(caller, _to, _transactions_len, _transactions);
+    Issue.emit(caller, recipient, transactions_len, transactions);
 
     return ();
 }
 
 @external
 func redeem{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    _from: felt, _transactions_len: felt, _transactions: Transaction*
+    sender: felt, transactions_len: felt, transactions: Transaction*
 ) {
     alloc_locals;
-    with_attr error_message("redeem: can't redeem from zero address, got _from={_from}") {
-        assert_not_zero(_from);
+    with_attr error_message("redeem: can't redeem from zero address, got sender={sender}") {
+        assert_not_zero(sender);
     }
 
     OPTIO.redeem(
-        sender=_from,
+        sender=sender,
         transaction_index=0,
-        transactions_len=_transactions_len,
-        transactions=_transactions,
+        transactions_len=transactions_len,
+        transactions=transactions,
     );
     let (caller) = get_caller_address();
-    Redeem.emit(caller, _from, _transactions_len, _transactions);
+    Redeem.emit(caller, sender, transactions_len, transactions);
 
     return ();
 }
 
 @external
 func burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    _from: felt, _transactions_len: felt, _transactions: Transaction*
+    sender: felt, transactions_len: felt, transactions: Transaction*
 ) {
     alloc_locals;
     let (local caller) = get_caller_address();
-    with_attr error_message("burn: caller is not owner, got _from={_from}") {
-        assert caller = _from;
+    with_attr error_message("burn: caller is not owner, got sender={sender}") {
+        assert caller = sender;
     }
 
     OPTIO.burn(
-        sender=_from,
+        sender=sender,
         transaction_index=0,
-        transactions_len=_transactions_len,
-        transactions=_transactions,
+        transactions_len=transactions_len,
+        transactions=transactions,
     );
-    Burn.emit(caller, _from, _transactions_len, _transactions);
+    Burn.emit(caller, sender, transactions_len, transactions);
 
     return ();
 }
