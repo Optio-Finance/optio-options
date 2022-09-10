@@ -64,7 +64,19 @@ func OfferCreated(offer: Offer) {
 }
 
 @event
+func OfferCancelled(offer: Offer) {
+}
+
+@event
 func OptionCreated(option: Option) {
+}
+
+@event
+func OptionRedeemed(option: Option) {
+}
+
+@event
+func OptionExercised(option: Option) {
 }
 
 //
@@ -185,18 +197,11 @@ namespace Options {
                 expiration=offer.expiration,
                 created=offer.created,
                 writer_address=offer.writer_address,
-                is_matched=TRUE,
-                is_active=FALSE,
-            );
-            offers.write(nonce, offer);
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+            is_matched=offer.is_matched,
+            is_active=FALSE,
+        );
+        offers.write(nonce, offer);
+        OfferCancelled.emit(offer);
 
         ReentrancyGuard.finish(nonce);
 
@@ -317,6 +322,7 @@ namespace Options {
                 is_active=FALSE,
             );
             options.write(nonce, option);
+            OptionRedeemed.emit(option);
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -386,6 +392,7 @@ namespace Options {
                 is_active=FALSE,
             );
             options.write(nonce, option);
+            OptionExercised.emit(option);
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
