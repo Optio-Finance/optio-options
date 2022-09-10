@@ -22,10 +22,13 @@ from contracts.standard.library import Transaction
 // @param amount Size of the offered position
 // @param writer_address The address of the option seller
 struct Offer {
+    class_id: felt,
+    unit_id: felt,
     nonce: felt,
     strike: felt,
     amount: felt,
     expiration: felt,
+    exponentiation: felt,
     created: felt,
     writer_address: felt,
     is_matched: felt,
@@ -43,10 +46,12 @@ struct Option {
     strike: felt,
     amount: felt,
     expiration: felt,
+    exponentiation: felt,
     premium: felt,
     created: felt,
     writer_address: felt,
     buyer_address: felt,
+    is_covered: felt,
     is_active: felt,
 }
 
