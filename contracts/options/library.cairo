@@ -109,13 +109,9 @@ namespace Options {
     //
 
     func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        strike: felt, amount: felt, expiration: felt,
+        class_id: felt, strike: felt, amount: felt, expiration: felt,
     ) {
         alloc_locals;
-
-        let (nonce: felt) = create_nonce();
-        let (current_timestamp: felt) = get_block_timestamp();
-
         with_attr error_message("create_offer: details could not be zeros") {
             assert_not_zero(strike);
             assert_not_zero(amount);
@@ -128,15 +124,11 @@ namespace Options {
         let (optio_address_value: felt) = optio_address.read();
         let (pool_address_value: felt) = pool_address.read();
 
-        let (collateral_put: felt) = IOptio.transferFrom(
+        IOptio.transferFrom(
             contract_address=optio_address_value,
             sender=caller_address,
             recipient=pool_address_value,
         );
-
-        with_attr error_message("create_offer: details could not be zeros") {
-            collateral_put = TRUE;
-        }
 
         let offer = Offer(
             nonce=nonce,
@@ -261,7 +253,7 @@ namespace Options {
             strike=offer.strike,
             amount=offer.amount,
             expiration=offer.expiration,
-            created=current_timestamp,
+            created=offer.created,
             writer_address=writer_address,
             is_matched=TRUE,
             is_active=FALSE,
