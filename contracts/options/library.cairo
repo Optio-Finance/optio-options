@@ -26,6 +26,7 @@ struct Offer {
     strike: felt,
     amount: felt,
     expiration: felt,
+    created: felt,
     writer_address: felt,
     is_matched: felt,
     is_active: felt,
@@ -43,6 +44,7 @@ struct Option {
     amount: felt,
     expiration: felt,
     premium: felt,
+    created: felt,
     writer_address: felt,
     buyer_address: felt,
     is_active: felt,
@@ -104,6 +106,8 @@ namespace Options {
             assert_not_zero(expiration);
         }
 
+        let (nonce: felt) = create_nonce();
+        let (current_timestamp: felt) = get_block_timestamp();
         let (caller_address: felt) = get_caller_address();
         let (optio_address_value: felt) = optio_address.read();
         let (pool_address_value: felt) = pool_address.read();
@@ -123,6 +127,7 @@ namespace Options {
             strike=strike,
             amount=amount,
             expiration=expiration,
+            created=current_timestamp,
             writer_address=caller_address,
             is_matched=FALSE,
             is_active=TRUE,
@@ -164,6 +169,7 @@ namespace Options {
                 strike=offer.strike,
                 amount=offer.amount,
                 expiration=offer.expiration,
+                created=offer.created,
                 writer_address=offer.writer_address,
                 is_matched=TRUE,
                 is_active=FALSE,
@@ -227,6 +233,7 @@ namespace Options {
             amount=offer.amount,
             expiration=current_timestamp + offer.expiration,
             premium=premium,
+            created=current_timestamp,
             writer=writer_address,
             buyer=buyer_address,
             is_active=TRUE,
@@ -237,6 +244,7 @@ namespace Options {
             strike=offer.strike,
             amount=offer.amount,
             expiration=offer.expiration,
+            created=current_timestamp,
             writer_address=writer_address,
             is_matched=TRUE,
             is_active=FALSE,
@@ -288,6 +296,7 @@ namespace Options {
                 amount=option.amount,
                 expiration=option.expiration,
                 premium=option.premium,
+                created=option.created,
                 writer=option.writer_address,
                 buyer=option.buyer_address,
                 is_active=FALSE,
@@ -356,6 +365,7 @@ namespace Options {
                 amount=option.amount,
                 expiration=option.expiration,
                 premium=option.premium,
+                created=option.created,
                 writer_address=option.writer_address,
                 buyer_address=option.buyer_address,
                 is_active=FALSE,
