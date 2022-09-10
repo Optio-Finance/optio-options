@@ -50,6 +50,22 @@ struct Option {
     is_active: felt,
 }
 
+//
+/// Events for ME callbacks
+//
+
+@event
+func OfferCreated(offer: Offer) {
+}
+
+@event
+func OptionCreated(option: Option) {
+}
+
+//
+/// Storage
+//
+
 @storage_var
 func optio_address() -> (optio_address: felt) {
 }
@@ -133,6 +149,7 @@ namespace Options {
             is_active=TRUE,
         );
         offers.write(nonce, offer);
+        OfferCreated.emit(offer);
 
         return ();
     }
@@ -250,6 +267,7 @@ namespace Options {
             is_active=FALSE,
         );
         offers.write(nonce, offer);
+        OptionCreated.emit(option);
 
         return ();
     }
