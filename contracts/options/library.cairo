@@ -84,7 +84,7 @@ func OptionExercised(option: Option) {
 //
 
 @storage_var
-func optio_address() -> (optio_address: felt) {
+func optio_standard() -> (optio_address: felt) {
 }
 
 @storage_var
@@ -113,9 +113,9 @@ namespace Options {
     /// Constructor
     //
     func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            optio_address_value: felt, class_id: felt, pool_address_value: felt,
+            optio_address: felt, class_id: felt, pool_address_value: felt,
         ) {
-        optio_address.write(optio_address_value);
+        optio_standard.write(optio_address);
         pool_address.write(pool_address_value);
         class.write(class_id);
         return ();
@@ -169,6 +169,7 @@ namespace Options {
         alloc_locals;
 
         let (offer: Offer) = offers.read(nonce);
+        let (optio_address: felt) = optio_standard.read();
         let (pool_address_value: felt) = pool_address.read();
         let (caller_address: felt) = get_caller_address();
 
@@ -221,7 +222,7 @@ namespace Options {
         ) {
         alloc_locals;
 
-        let (optio_address_value: felt) = optio_address.read();
+        let (optio_address: felt) = optio_standard.read();
         let (pool_address_value: felt) = pool_address.read();
         let (offer: Offer) = offers.read(nonce);
 
@@ -234,7 +235,7 @@ namespace Options {
         assert transactions[1] = Transaction();
 
         let (succeed: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
+            contract_address=optio_address,
             sender=writer_address,
             recipient=pool_address_value,
             transactions_len=1,
@@ -299,10 +300,10 @@ namespace Options {
 
         ReentrancyGuard.start(nonce);
 
-        let (optio_address_value: felt) = optio_address.read();
+        let (optio_address: felt) = optio_standard.read();
         let (pool_address_value: felt) = pool_address.read();
         let (redeem_succeed: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
+            contract_address=optio_address,
             sender=pool_address_value,
             recipient=caller_address,
         );
@@ -362,7 +363,7 @@ namespace Options {
 
         ReentrancyGuard.start(nonce);
 
-        let (optio_address_value: felt) = optio_address.read();
+        let (optio_address: felt) = optio_standard.read();
         let (pool_address_value: felt) = pool_address.read();
 
         let (transactions: felt*) = alloc();
@@ -370,7 +371,7 @@ namespace Options {
         assert transactions[1] = Transaction();
 
         let (payout_succeed: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
+            contract_address=optio_address,
             sender=pool_address_value,
             recipient=caller_address,
             transactions_len=2,
