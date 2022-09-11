@@ -192,29 +192,36 @@ namespace Options {
         let (caller_address: felt) = get_caller_address();
 
         with_attr error_message("cancel_offer: only writer can cancel") {
-            assert caller_address = offer.writer;
+            assert caller_address = offer.writer_address;
         }
 
-        with_attr error_message("cancel_offer: offer is no longer active") {
+        with_attr error_message("cancel_offer: offer was matched or not active") {
             assert offer.is_active = TRUE;
+            assert offer.is_matched = FALSE;
         }
 
         ReentrancyGuard.start(nonce);
 
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
         IOptio.transferFrom(
             contract_address=optio_address,
             sender=pool_address,
             recipient=caller_address,
+            transactions_len=1,
+            transactions=transactions,
         );
 
-        if (refund_succeed == TRUE) {
-            let offer = Offer(
-                nonce=nonce,
-                strike=offer.strike,
-                amount=offer.amount,
-                expiration=offer.expiration,
-                created=offer.created,
-                writer_address=offer.writer_address,
+        let offer = Offer(
+            class_id=offer.class_id,
+            unit_id=offer.unit_id,
+            nonce=nonce,
+            strike=offer.strike,
+            amount=offer.amount,
+            expiration=offer.expiration,
+            exponentiation=1,
+            created=offer.created,
+            writer_address=offer.writer_address,
             is_matched=offer.is_matched,
             is_active=FALSE,
         );
