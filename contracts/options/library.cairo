@@ -12,7 +12,7 @@ from starkware.starknet.common.syscalls import (
 
 from contracts.security.reentrancy_guard import ReentrancyGuard
 from contracts.standard.interfaces.IOptio import IOptio
-from contracts.standard.library import Transaction
+from contracts.standard.library import Transaction, Values
 
 // @notice Offer data goes into Matching Engine
 // @dev No obligations at this stage
@@ -92,6 +92,10 @@ func optio_pool() -> (pool_address: felt) {
 }
 
 @storage_var
+func optio_vault() -> (vault_address: felt) {
+}
+
+@storage_var
 func class() -> (class_id: felt) {
 }
 
@@ -113,7 +117,7 @@ namespace Options {
     /// Constructor
     //
     func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            optio_address: felt, class_id: felt, pool_address: felt,
+            optio_address: felt, pool_address: felt, class_id: felt
         ) {
         optio_standard.write(optio_address);
         optio_pool.write(pool_address);
@@ -166,7 +170,7 @@ namespace Options {
     }
 
     func cancel_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt
+            class_id: felt, unit_id: felt, nonce: felt, amount: felt
         ) {
         alloc_locals;
 
@@ -207,10 +211,6 @@ namespace Options {
 
         ReentrancyGuard.finish(nonce);
 
-        with_attr error_message("cancel_offer: refund failed, state wasn't updated") {
-            assert refund_succeed = TRUE;
-        }
-
         return ();
     }
 
@@ -219,7 +219,15 @@ namespace Options {
     //
 
     func write_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt, writer_address: felt, buyer_address: felt, premium: felt,
+            nonce: felt,
+            class_id: felt,
+            writer_address: felt,
+            buyer_address: felt,
+            premium: felt,
+            metadata_ids_len: felt,
+            metadata_ids: felt*,
+            values_len: felt,
+            values: Values*,
         ) {
         alloc_locals;
 
@@ -231,9 +239,10 @@ namespace Options {
             assert writer_address = offer.writer_address;
         }
 
-        let (transactions: felt*) = alloc();
-        assert transactions[0] = Transaction();
-        assert transactions[1] = Transaction();
+        with_attr error_message("write_option: offer is already matched") {
+            assert offer.is_matched = FALSE;
+            assert offer.is_active = TRUE;
+        }
 
         let (succeed: felt) = IOptio.transferFrom(
             contract_address=optio_address,
@@ -278,7 +287,7 @@ namespace Options {
 
     // @notice In case if expired by not exercised
     func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt
+            class_id: felt, unit_id: felt, nonce: felt
         ) {
         alloc_locals;
 
@@ -296,7 +305,7 @@ namespace Options {
         let (caller_address: felt) = get_caller_address();
 
         with_attr error_message("redeem_option: writer only") {
-            assert caller_address = option.writer;
+            assert caller_address = option.writer_address;
         }
 
         ReentrancyGuard.start(nonce);
@@ -336,15 +345,11 @@ namespace Options {
 
         ReentrancyGuard.finish(nonce);
 
-        with_attr error_message("redeem_option: transferFrom failed") {
-            assert redeem_succeed = TRUE;
-        }
-
         return ();
     }
 
     func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt
+            class_id: felt, unit_id: felt, nonce: felt, amount: felt
         ) {
         alloc_locals;
 
@@ -405,10 +410,6 @@ namespace Options {
         }
 
         ReentrancyGuard.finish(nonce);
-
-        with_attr error_message("exercise_option: payout failed") {
-            payout_succeed = TRUE;
-        }
 
         return ();
     }
