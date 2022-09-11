@@ -38,9 +38,27 @@ func cancelOffer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func writeOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        nonce: felt, writer_address: felt, buyer_address: felt, fee: felt,
+        nonce: felt,
+        class_id: felt,
+        writer_address: felt,
+        buyer_address: felt,
+        premium: felt,
+        metadata_ids_len: felt,
+        metadata_ids: felt*,
+        values_len: felt,
+        values: Values*,
     ) {
-    Options.write_option(nonce, writer_address, buyer_address);
+    Options.write_option(
+        nonce,
+        class_id,
+        writer_address,
+        buyer_address,
+        premium,
+        metadata_ids_len,
+        metadata_ids,
+        values_len,
+        values,
+    );
     return ();
 }
 
