@@ -12,7 +12,7 @@ from starkware.starknet.common.syscalls import (
 
 from contracts.security.reentrancy_guard import ReentrancyGuard
 from contracts.standard.interfaces.IOptio import IOptio
-from contracts.standard.library import Transaction
+from contracts.standard.library import Transaction, Values
 
 // @notice Offer data goes into Matching Engine
 // @dev No obligations at this stage
@@ -92,6 +92,10 @@ func optio_pool() -> (pool_address: felt) {
 }
 
 @storage_var
+func optio_vault() -> (vault_address: felt) {
+}
+
+@storage_var
 func class() -> (class_id: felt) {
 }
 
@@ -113,7 +117,7 @@ namespace Options {
     /// Constructor
     //
     func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            optio_address: felt, class_id: felt, pool_address: felt,
+            optio_address: felt, pool_address: felt, class_id: felt
         ) {
         optio_standard.write(optio_address);
         optio_pool.write(pool_address);
@@ -135,12 +139,19 @@ namespace Options {
             assert_not_zero(expiration);
         }
 
+        // @notice Initiating the full collateralization of the call option
+        // @notice Currently it's full covered call (will change in next versions)
         let (nonce: felt) = create_nonce();
         let (current_timestamp: felt) = get_block_timestamp();
         let (caller_address: felt) = get_caller_address();
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
+        let (unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
 
+        // @dev The batch here always contains a single micro-transaction
+        // @dev But in practice a batch can contain hundreds of micro-transactions
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
         IOptio.transferFrom(
             contract_address=optio_address,
             sender=caller_address,
@@ -150,23 +161,28 @@ namespace Options {
         );
 
         let offer = Offer(
+            class_id=class_id,
+            unit_id=unit_id,
             nonce=nonce,
             strike=strike,
             amount=amount,
             expiration=expiration,
+            exponentiation=1,
             created=current_timestamp,
             writer_address=caller_address,
             is_matched=FALSE,
             is_active=TRUE,
         );
         offers.write(nonce, offer);
+
+        // @dev Ready to get matched, emitting event for ME
         OfferCreated.emit(offer);
 
         return ();
     }
 
     func cancel_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt
+            class_id: felt, unit_id: felt, nonce: felt, amount: felt
         ) {
         alloc_locals;
 
@@ -176,29 +192,36 @@ namespace Options {
         let (caller_address: felt) = get_caller_address();
 
         with_attr error_message("cancel_offer: only writer can cancel") {
-            assert caller_address = offer.writer;
+            assert caller_address = offer.writer_address;
         }
 
-        with_attr error_message("cancel_offer: offer is no longer active") {
+        with_attr error_message("cancel_offer: offer was matched or not active") {
             assert offer.is_active = TRUE;
+            assert offer.is_matched = FALSE;
         }
 
         ReentrancyGuard.start(nonce);
 
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
         IOptio.transferFrom(
             contract_address=optio_address,
             sender=pool_address,
             recipient=caller_address,
+            transactions_len=1,
+            transactions=transactions,
         );
 
-        if (refund_succeed == TRUE) {
-            let offer = Offer(
-                nonce=nonce,
-                strike=offer.strike,
-                amount=offer.amount,
-                expiration=offer.expiration,
-                created=offer.created,
-                writer_address=offer.writer_address,
+        let offer = Offer(
+            class_id=offer.class_id,
+            unit_id=offer.unit_id,
+            nonce=nonce,
+            strike=offer.strike,
+            amount=offer.amount,
+            expiration=offer.expiration,
+            exponentiation=1,
+            created=offer.created,
+            writer_address=offer.writer_address,
             is_matched=offer.is_matched,
             is_active=FALSE,
         );
@@ -206,10 +229,6 @@ namespace Options {
         OfferCancelled.emit(offer);
 
         ReentrancyGuard.finish(nonce);
-
-        with_attr error_message("cancel_offer: refund failed, state wasn't updated") {
-            assert refund_succeed = TRUE;
-        }
 
         return ();
     }
@@ -219,66 +238,119 @@ namespace Options {
     //
 
     func write_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt, writer_address: felt, buyer_address: felt, premium: felt,
+            nonce: felt,
+            class_id: felt,
+            writer_address: felt,
+            buyer_address: felt,
+            premium: felt,
+            metadata_ids_len: felt,
+            metadata_ids: felt*,
+            values_len: felt,
+            values: Values*,
         ) {
         alloc_locals;
 
+        with_attr error_message("create_offer: got zero inputs lengths") {
+            assert_not_zero(metadata_ids_len);
+            assert_not_zero(values_len);
+        }
+
+        ReentrancyGuard.start(nonce);
+
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
+        let (vault_address: felt) = optio_vault.read();
         let (offer: Offer) = offers.read(nonce);
+        let (current_timestamp) = get_block_timestamp();
 
         with_attr error_message("write_option: writer's addresses don't match") {
             assert writer_address = offer.writer_address;
         }
 
-        let (transactions: felt*) = alloc();
-        assert transactions[0] = Transaction();
-        assert transactions[1] = Transaction();
+        with_attr error_message("write_option: offer is already matched") {
+            assert offer.is_matched = FALSE;
+            assert offer.is_active = TRUE;
+        }
 
-        let (succeed: felt) = IOptio.transferFrom(
+        let (prev_unit_id) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
+        let unit_id = prev_unit_id + 1;
+
+        // @notice Transferring the premium from a buyer to a writer
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, premium);
+        IOptio.transferFrom(
             contract_address=optio_address,
-            sender=writer_address,
-            recipient=pool_address,
+            sender=buyer_address,
+            recipient=offer.writer_address,
             transactions_len=1,
             transactions=transactions,
         );
 
-        with_attr error_message("write_option: collateral transfer failed") {
-            assert succeed = TRUE;
-        }
+        // @notice Transferring the collateral from Optio pool to the Optio vault
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, offer.amount);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=pool_address,
+            recipient=vault_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
 
-        let (current_timestamp) = get_block_timestamp();
+        // @dev Creating the actual option
+        IOptio.createUnit(
+            contract_address=optio_address,
+            class_id=class_id,
+            unit_id=unit_id,
+            metadata_ids_len=metadata_ids_len,
+            metadata_ids=metadata_ids,
+            values_len=values_len,
+            values=values
+        );
         let option = Option(
+            class_id=offer.class_id,
+            unit_id=offer.unit_id,
             nonce=nonce,
             strike=offer.strike,
             amount=offer.amount,
             expiration=current_timestamp + offer.expiration,
+            exponentiation=offer.exponentiation,
             premium=premium,
             created=current_timestamp,
-            writer=writer_address,
-            buyer=buyer_address,
+            writer_address=writer_address,
+            buyer_address=buyer_address,
+            is_covered=TRUE,
             is_active=TRUE,
         );
         options.write(nonce, option);
+
+        // @dev Disarming the offer
         let offer = Offer(
+            class_id=offer.class_id,
+            unit_id=offer.unit_id,
             nonce=nonce,
             strike=offer.strike,
             amount=offer.amount,
             expiration=offer.expiration,
+            exponentiation=1,
             created=offer.created,
             writer_address=writer_address,
             is_matched=TRUE,
             is_active=FALSE,
         );
         offers.write(nonce, offer);
+
+        // @dev Emitting events for ME
         OptionCreated.emit(option);
+
+        ReentrancyGuard.finish(nonce);
 
         return ();
     }
 
     // @notice In case if expired by not exercised
     func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt
+            class_id: felt, unit_id: felt, nonce: felt
         ) {
         alloc_locals;
 
@@ -296,62 +368,56 @@ namespace Options {
         let (caller_address: felt) = get_caller_address();
 
         with_attr error_message("redeem_option: writer only") {
-            assert caller_address = option.writer;
+            assert caller_address = option.writer_address;
         }
 
         ReentrancyGuard.start(nonce);
 
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
-        let (redeem_succeed: felt) = IOptio.transferFrom(
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, option.amount);
+        IOptio.transferFrom(
             contract_address=optio_address,
             sender=pool_address,
             recipient=caller_address,
+            transactions_len=1,
+            transactions=transactions,
         );
 
-        if (redeem_succeed == TRUE) {
-            let (option: Option) = Option(
-                class_id=option.class_id,
-                unit_id=option.unit_id,
-                nonce=nonce,
-                strike=option.strike,
-                amount=option.amount,
-                expiration=option.expiration,
-                premium=option.premium,
-                created=option.created,
-                writer=option.writer_address,
-                buyer=option.buyer_address,
-                is_active=FALSE,
-            );
-            options.write(nonce, option);
-            OptionRedeemed.emit(option);
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+        let option = Option(
+            class_id=option.class_id,
+            unit_id=option.unit_id,
+            nonce=nonce,
+            strike=option.strike,
+            amount=option.amount,
+            expiration=option.expiration,
+            exponentiation=option.exponentiation,
+            premium=option.premium,
+            created=option.created,
+            writer_address=option.writer_address,
+            buyer_address=option.buyer_address,
+            is_covered=option.is_covered,
+            is_active=FALSE,
+        );
+        options.write(nonce, option);
+        OptionRedeemed.emit(option);
 
         ReentrancyGuard.finish(nonce);
-
-        with_attr error_message("redeem_option: transferFrom failed") {
-            assert redeem_succeed = TRUE;
-        }
 
         return ();
     }
 
     func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            nonce: felt
+            class_id: felt, unit_id: felt, nonce: felt, amount: felt
         ) {
         alloc_locals;
 
         let (option: Option) = options.read(nonce);
         let (caller_address: felt) = get_caller_address();
 
-        with_attr error_message("exercise_option: expected buyer={option}, got={caller}") {
+        with_attr error_message("exercise_option: expected buyer, got={caller_address}") {
             assert caller_address = option.buyer_address;
         }
 
@@ -367,11 +433,11 @@ namespace Options {
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
 
-        let (transactions: felt*) = alloc();
-        assert transactions[0] = Transaction();
-        assert transactions[1] = Transaction();
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
+        assert transactions[1] = Transaction(class_id, unit_id, amount);
 
-        let (payout_succeed: felt) = IOptio.transferFrom(
+        IOptio.transferFrom(
             contract_address=optio_address,
             sender=pool_address,
             recipient=caller_address,
@@ -379,36 +445,25 @@ namespace Options {
             transactions=transactions,
         );
 
-        if (payout_succeed == TRUE) {
-            let (option: Option) = Option(
-                class_id=option.class_id,
-                unit_id=option.unit_id,
-                nonce=nonce,
-                strike=option.strike,
-                amount=option.amount,
-                expiration=option.expiration,
-                premium=option.premium,
-                created=option.created,
-                writer_address=option.writer_address,
-                buyer_address=option.buyer_address,
-                is_active=FALSE,
-            );
-            options.write(nonce, option);
-            OptionExercised.emit(option);
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+        let option = Option(
+            class_id=option.class_id,
+            unit_id=option.unit_id,
+            nonce=nonce,
+            strike=option.strike,
+            amount=option.amount,
+            expiration=option.expiration,
+            exponentiation=option.exponentiation,
+            premium=option.premium,
+            created=option.created,
+            writer_address=option.writer_address,
+            buyer_address=option.buyer_address,
+            is_covered=option.is_covered,
+            is_active=FALSE,
+        );
+        options.write(nonce, option);
+        OptionExercised.emit(option);
 
         ReentrancyGuard.finish(nonce);
-
-        with_attr error_message("exercise_option: payout failed") {
-            payout_succeed = TRUE;
-        }
 
         return ();
     }

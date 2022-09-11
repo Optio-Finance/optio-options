@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from contracts.options.library import Options
+from contracts.options.library import Options, Values
 
 
 //
@@ -22,40 +22,58 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func createOffer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        strike: felt, amount: felt, expiration: felt,
+        class_id: felt, strike: felt, amount: felt, expiration: felt,
     ) {
-    Options.create_offer(strike, amount, expiration);
+    Options.create_offer(class_id, strike, amount, expiration);
     return ();
 }
 
 @external
 func cancelOffer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        nonce: felt
+        class_id: felt, unit_id: felt, nonce: felt, amount: felt
     ) {
-    Options.create_offer(nonce);
+    Options.cancel_offer(class_id, unit_id, nonce, amount);
     return ();
 }
 
 @external
 func writeOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        nonce: felt, writer_address: felt, buyer_address: felt, fee: felt,
+        nonce: felt,
+        class_id: felt,
+        writer_address: felt,
+        buyer_address: felt,
+        premium: felt,
+        metadata_ids_len: felt,
+        metadata_ids: felt*,
+        values_len: felt,
+        values: Values*,
     ) {
-    Options.write_option(nonce, writer_address, buyer_address);
+    Options.write_option(
+        nonce,
+        class_id,
+        writer_address,
+        buyer_address,
+        premium,
+        metadata_ids_len,
+        metadata_ids,
+        values_len,
+        values,
+    );
     return ();
 }
 
 @external
 func redeemOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        nonce: felt
+        class_id: felt, unit_id: felt, nonce: felt
     ) {
-    Options.redeem_option(nonce);
+    Options.redeem_option(class_id, unit_id, nonce);
     return ();
 }
 
 @external
 func exerciseOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        nonce: felt
+        class_id: felt, unit_id: felt, nonce: felt, amount: felt
     ) {
-    Options.exercise_option(nonce);
+    Options.exercise_option(class_id, unit_id, nonce, amount);
     return ();
 }
