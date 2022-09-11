@@ -375,36 +375,34 @@ namespace Options {
 
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
-        let (redeem_succeed: felt) = IOptio.transferFrom(
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, option.amount);
+        IOptio.transferFrom(
             contract_address=optio_address,
             sender=pool_address,
             recipient=caller_address,
+            transactions_len=1,
+            transactions=transactions,
         );
 
-        if (redeem_succeed == TRUE) {
-            let (option: Option) = Option(
-                class_id=option.class_id,
-                unit_id=option.unit_id,
-                nonce=nonce,
-                strike=option.strike,
-                amount=option.amount,
-                expiration=option.expiration,
-                premium=option.premium,
-                created=option.created,
-                writer=option.writer_address,
-                buyer=option.buyer_address,
-                is_active=FALSE,
-            );
-            options.write(nonce, option);
-            OptionRedeemed.emit(option);
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+        let option = Option(
+            class_id=option.class_id,
+            unit_id=option.unit_id,
+            nonce=nonce,
+            strike=option.strike,
+            amount=option.amount,
+            expiration=option.expiration,
+            exponentiation=option.exponentiation,
+            premium=option.premium,
+            created=option.created,
+            writer_address=option.writer_address,
+            buyer_address=option.buyer_address,
+            is_covered=option.is_covered,
+            is_active=FALSE,
+        );
+        options.write(nonce, option);
+        OptionRedeemed.emit(option);
 
         ReentrancyGuard.finish(nonce);
 
