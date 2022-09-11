@@ -22,10 +22,14 @@ from contracts.standard.library import Transaction
 // @param amount Size of the offered position
 // @param writer_address The address of the option seller
 struct Offer {
+    class_id: felt,
+    unit_id: felt,
     nonce: felt,
     strike: felt,
     amount: felt,
     expiration: felt,
+    exponentiation: felt,
+    created: felt,
     writer_address: felt,
     is_matched: felt,
     is_active: felt,
@@ -42,18 +46,49 @@ struct Option {
     strike: felt,
     amount: felt,
     expiration: felt,
+    exponentiation: felt,
     premium: felt,
+    created: felt,
     writer_address: felt,
     buyer_address: felt,
+    is_covered: felt,
     is_active: felt,
 }
 
+//
+/// Events for ME callbacks
+//
+
+@event
+func OfferCreated(offer: Offer) {
+}
+
+@event
+func OfferCancelled(offer: Offer) {
+}
+
+@event
+func OptionCreated(option: Option) {
+}
+
+@event
+func OptionRedeemed(option: Option) {
+}
+
+@event
+func OptionExercised(option: Option) {
+}
+
+//
+/// Storage
+//
+
 @storage_var
-func optio_address() -> (optio_address: felt) {
+func optio_standard() -> (optio_address: felt) {
 }
 
 @storage_var
-func pool_address() -> (pool_address: felt) {
+func optio_pool() -> (pool_address: felt) {
 }
 
 @storage_var
@@ -78,10 +113,10 @@ namespace Options {
     /// Constructor
     //
     func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            optio_address_value: felt, class_id: felt, pool_address_value: felt,
+            optio_address: felt, class_id: felt, pool_address: felt,
         ) {
-        optio_address.write(optio_address_value);
-        pool_address.write(pool_address_value);
+        optio_standard.write(optio_address);
+        optio_pool.write(pool_address);
         class.write(class_id);
         return ();
     }
@@ -91,43 +126,41 @@ namespace Options {
     //
 
     func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        strike: felt, amount: felt, expiration: felt,
+        class_id: felt, strike: felt, amount: felt, expiration: felt,
     ) {
         alloc_locals;
-
-        let (nonce: felt) = create_nonce();
-        let (current_timestamp: felt) = get_block_timestamp();
-
         with_attr error_message("create_offer: details could not be zeros") {
             assert_not_zero(strike);
             assert_not_zero(amount);
             assert_not_zero(expiration);
         }
 
+        let (nonce: felt) = create_nonce();
+        let (current_timestamp: felt) = get_block_timestamp();
         let (caller_address: felt) = get_caller_address();
-        let (optio_address_value: felt) = optio_address.read();
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
 
-        let (collateral_put: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
+        IOptio.transferFrom(
+            contract_address=optio_address,
             sender=caller_address,
-            recipient=pool_address_value,
+            recipient=pool_address,
+            transactions_len=1,
+            transactions=transactions,
         );
-
-        with_attr error_message("create_offer: details could not be zeros") {
-            collateral_put = TRUE;
-        }
 
         let offer = Offer(
             nonce=nonce,
             strike=strike,
             amount=amount,
             expiration=expiration,
+            created=current_timestamp,
             writer_address=caller_address,
             is_matched=FALSE,
             is_active=TRUE,
         );
         offers.write(nonce, offer);
+        OfferCreated.emit(offer);
 
         return ();
     }
@@ -138,7 +171,8 @@ namespace Options {
         alloc_locals;
 
         let (offer: Offer) = offers.read(nonce);
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
         let (caller_address: felt) = get_caller_address();
 
         with_attr error_message("cancel_offer: only writer can cancel") {
@@ -151,10 +185,9 @@ namespace Options {
 
         ReentrancyGuard.start(nonce);
 
-        let (optio_address_value: felt) = optio_address.read();
-        let (refund_succeed: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
-            sender=pool_address_value,
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=pool_address,
             recipient=caller_address,
         );
 
@@ -164,19 +197,13 @@ namespace Options {
                 strike=offer.strike,
                 amount=offer.amount,
                 expiration=offer.expiration,
+                created=offer.created,
                 writer_address=offer.writer_address,
-                is_matched=TRUE,
-                is_active=FALSE,
-            );
-            offers.write(nonce, offer);
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+            is_matched=offer.is_matched,
+            is_active=FALSE,
+        );
+        offers.write(nonce, offer);
+        OfferCancelled.emit(offer);
 
         ReentrancyGuard.finish(nonce);
 
@@ -196,8 +223,8 @@ namespace Options {
         ) {
         alloc_locals;
 
-        let (optio_address_value: felt) = optio_address.read();
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
         let (offer: Offer) = offers.read(nonce);
 
         with_attr error_message("write_option: writer's addresses don't match") {
@@ -209,9 +236,9 @@ namespace Options {
         assert transactions[1] = Transaction();
 
         let (succeed: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
+            contract_address=optio_address,
             sender=writer_address,
-            recipient=pool_address_value,
+            recipient=pool_address,
             transactions_len=1,
             transactions=transactions,
         );
@@ -227,6 +254,7 @@ namespace Options {
             amount=offer.amount,
             expiration=current_timestamp + offer.expiration,
             premium=premium,
+            created=current_timestamp,
             writer=writer_address,
             buyer=buyer_address,
             is_active=TRUE,
@@ -237,11 +265,13 @@ namespace Options {
             strike=offer.strike,
             amount=offer.amount,
             expiration=offer.expiration,
+            created=offer.created,
             writer_address=writer_address,
             is_matched=TRUE,
             is_active=FALSE,
         );
         offers.write(nonce, offer);
+        OptionCreated.emit(option);
 
         return ();
     }
@@ -271,11 +301,11 @@ namespace Options {
 
         ReentrancyGuard.start(nonce);
 
-        let (optio_address_value: felt) = optio_address.read();
-        let (pool_address_value: felt) = pool_address.read(nonce);
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
         let (redeem_succeed: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
-            sender=pool_address_value,
+            contract_address=optio_address,
+            sender=pool_address,
             recipient=caller_address,
         );
 
@@ -288,11 +318,13 @@ namespace Options {
                 amount=option.amount,
                 expiration=option.expiration,
                 premium=option.premium,
+                created=option.created,
                 writer=option.writer_address,
                 buyer=option.buyer_address,
                 is_active=FALSE,
             );
             options.write(nonce, option);
+            OptionRedeemed.emit(option);
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -332,16 +364,16 @@ namespace Options {
 
         ReentrancyGuard.start(nonce);
 
-        let (optio_address_value: felt) = optio_address.read();
-        let (pool_address_value: felt) = pool_address.read();
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
 
         let (transactions: felt*) = alloc();
         assert transactions[0] = Transaction();
         assert transactions[1] = Transaction();
 
         let (payout_succeed: felt) = IOptio.transferFrom(
-            contract_address=optio_address_value,
-            sender=pool_address_value,
+            contract_address=optio_address,
+            sender=pool_address,
             recipient=caller_address,
             transactions_len=2,
             transactions=transactions,
@@ -356,11 +388,13 @@ namespace Options {
                 amount=option.amount,
                 expiration=option.expiration,
                 premium=option.premium,
+                created=option.created,
                 writer_address=option.writer_address,
                 buyer_address=option.buyer_address,
                 is_active=FALSE,
             );
             options.write(nonce, option);
+            OptionExercised.emit(option);
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -387,14 +421,14 @@ func get_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return (nonce_value=nonce_value);
 }
 
-func update_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(nonce_value: felt) -> () {
-    nonce.write(nonce_value);
+func update_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(new_nonce: felt) -> () {
+    nonce.write(new_nonce);
     return ();
 }
 
 func create_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (nonce_value: felt) {
-    let (nonce: felt) = get_nonce();
-    tempvar nonce_value = nonce + 1;
-    update_nonce(nonce_value);
-    return (nonce_value=nonce_value);
+    let (prev_nonce: felt) = get_nonce();
+    tempvar new_nonce = prev_nonce + 1;
+    update_nonce(new_nonce);
+    return (nonce_value=new_nonce);
 }

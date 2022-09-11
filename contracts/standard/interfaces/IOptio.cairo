@@ -7,46 +7,46 @@ from contracts.standard.library import Transaction, ClassMetadata, UnitMetadata,
 @contract_interface
 namespace IOptio {
     // @notice Allows transferring units in batches or individually
-    // @param _from The address of the tokens holder
-    // @param _to The address of the tokens recipient
-    // @param _transactions_len The counter used for recursion
-    // @param _transactions The set of transactions to be processed
+    // @param sender The address of the tokens holder
+    // @param recipient The address of the tokens recipient
+    // @param transactions_len The counter used for recursion
+    // @param transactions The set of transactions to be processed
     func transferFrom(
-        _from: felt, _to: felt, _transactions_len: felt, _transactions: Transaction*
+        sender: felt, recipient: felt, transactions_len: felt, transactions: Transaction*
     ) {
     }
 
     // @notice Allows to transfer allowances in batches or individually
-    // @param _from The address of the tokens holder
-    // @param _to The address of the tokens recipient
-    // @param _transactions_len The counter used for recursion
-    // @param _transactions The set of transactions to be processed
+    // @param sender The address of the tokens holder
+    // @param recipient The address of the tokens recipient
+    // @param transactions_len The counter used for recursion
+    // @param transactions The set of transactions to be processed
     func transferAllowanceFrom(
-        _from: felt, _to: felt, _transactions_len: felt, _transactions: Transaction*
+        sender: felt, recipient: felt, transactions_len: felt, transactions: Transaction*
     ) {
     }
 
     // @notice Allows issuing rights and obligations to an address
     // @dev Restricted to the authorized issuers of a contract
-    // @param _to The address of the tokens recipient
-    // @param _transactions_len The counter used for recursion
-    // @param _transactions The set of transactions to be processed
-    func issue(_to: felt, _transactions_len: felt, _transactions: Transaction*) {
+    // @param recipient The address of the tokens recipient
+    // @param transactions_len The counter used for recursion
+    // @param transactions The set of transactions to be processed
+    func issue(recipient: felt, transactions_len: felt, transactions: Transaction*) {
     }
 
     // @notice Allows redeeming rights and obligations from an address
     // @dev Restricted to the authorized issuers of a contract
-    // @param _to The address of the tokens recipient
-    // @param _transactions_len The counter used for recursion
-    // @param _transactions The set of transactions to be processed
-    func redeem(_from: felt, _transactions_len: felt, _transactions: Transaction*) {
+    // @param recipient The address of the tokens recipient
+    // @param transactions_len The counter used for recursion
+    // @param transactions The set of transactions to be processed
+    func redeem(sender: felt, transactions_len: felt, transactions: Transaction*) {
     }
 
     // @notice Allows burning tokens at the end of the token lifecycle
-    // @param _from The address of the tokens holder
-    // @param _transactions_len The counter used for recursion
-    // @param _transactions The set of transactions to be processed
-    func burn(_from: felt, _transactions_len: felt, _transactions: Transaction*) {
+    // @param sender The address of the tokens holder
+    // @param transactions_len The counter used for recursion
+    // @param transactions The set of transactions to be processed
+    func burn(sender: felt, transactions_len: felt, transactions: Transaction*) {
     }
 
     // @notice Allows `spender` to withdraw tokens from `owner` up to the approved limit
@@ -114,5 +114,13 @@ namespace IOptio {
     // @param owner The address which is approving `spender` to operate over all tokens in all `owner` Units
     // @param operator The address which is going to be approved for operating over tokens
     func isApprovedFor(owner: felt, operator: felt) -> (approved: felt) {
+    }
+
+    func getLatestUnit(class_id: felt) -> (unit_id: felt) {
+    }
+
+    func createUnit(
+            class_id: felt, unit_id: felt, metadata_ids_len: felt, metadata_ids: felt*, values_len: felt, values: Values*
+        ) {
     }
 }
