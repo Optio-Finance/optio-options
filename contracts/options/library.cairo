@@ -417,7 +417,7 @@ namespace Options {
         let (option: Option) = options.read(nonce);
         let (caller_address: felt) = get_caller_address();
 
-        with_attr error_message("exercise_option: expected buyer={option}, got={caller}") {
+        with_attr error_message("exercise_option: expected buyer, got={caller_address}") {
             assert caller_address = option.buyer_address;
         }
 
@@ -433,11 +433,11 @@ namespace Options {
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
 
-        let (transactions: felt*) = alloc();
-        assert transactions[0] = Transaction();
-        assert transactions[1] = Transaction();
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
+        assert transactions[1] = Transaction(class_id, unit_id, amount);
 
-        let (payout_succeed: felt) = IOptio.transferFrom(
+        IOptio.transferFrom(
             contract_address=optio_address,
             sender=pool_address,
             recipient=caller_address,
@@ -445,30 +445,23 @@ namespace Options {
             transactions=transactions,
         );
 
-        if (payout_succeed == TRUE) {
-            let (option: Option) = Option(
-                class_id=option.class_id,
-                unit_id=option.unit_id,
-                nonce=nonce,
-                strike=option.strike,
-                amount=option.amount,
-                expiration=option.expiration,
-                premium=option.premium,
-                created=option.created,
-                writer_address=option.writer_address,
-                buyer_address=option.buyer_address,
-                is_active=FALSE,
-            );
-            options.write(nonce, option);
-            OptionExercised.emit(option);
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+        let option = Option(
+            class_id=option.class_id,
+            unit_id=option.unit_id,
+            nonce=nonce,
+            strike=option.strike,
+            amount=option.amount,
+            expiration=option.expiration,
+            exponentiation=option.exponentiation,
+            premium=option.premium,
+            created=option.created,
+            writer_address=option.writer_address,
+            buyer_address=option.buyer_address,
+            is_covered=option.is_covered,
+            is_active=FALSE,
+        );
+        options.write(nonce, option);
+        OptionExercised.emit(option);
 
         ReentrancyGuard.finish(nonce);
 
