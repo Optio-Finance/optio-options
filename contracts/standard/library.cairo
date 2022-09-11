@@ -9,12 +9,30 @@ from starkware.starknet.common.syscalls import (
 )
 
 
+struct ClassProps {
+    exists: felt,
+    creator: felt,
+    created: felt,
+    latest_unit_id: felt,
+    latest_unit_timestamp: felt,
+    liquidity: felt,
+    total_supply: felt,
+}
+
 struct ClassMetadata {
     class_id: felt,
     metadata_id: felt,
     name: felt,
     type: felt,
     description: felt,
+}
+
+struct UnitProps {
+    unit_id: felt,
+    exists: felt,
+    creator: felt,
+    created: felt,
+    prev_unit_id: felt,
 }
 
 struct UnitMetadata {
@@ -64,11 +82,19 @@ struct Transaction {
 //
 
 @storage_var
+func classProps(class_id: felt) -> (props: ClassProps) {
+}
+
+@storage_var
 func classMetadata(class_id: felt, metadata_id: felt) -> (classMetadata: ClassMetadata) {
 }
 
 @storage_var
 func classes(class_id: felt, metadata_id: felt) -> (class: Values) {
+}
+
+@storage_var
+func unitProps(class_id: felt, unit_id: felt) -> (props: UnitProps) {
 }
 
 @storage_var
