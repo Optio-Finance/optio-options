@@ -7,7 +7,12 @@ from starkware.starknet.common.syscalls import (
     get_caller_address,
     get_contract_address,
 )
-from contracts.standard.library import ClassMetadata, UnitMetadata, Values, Class, Unit, Transaction
+from contracts.standard.library import (
+    ClassMetadata, UnitMetadata,
+    ClassProps, UnitProps,
+    Class, Unit,
+    Values, Transaction,
+)
 
 from contracts.security.reentrancy_guard import ReentrancyGuard
 from contracts.standard.library import OPTIO
@@ -218,7 +223,7 @@ func getUnitMetadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return (unitMetadata,);
 }
 
-@external
+@view
 func getClassData{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     class_id: felt, metadata_id: felt
 ) -> (classData: Values) {
@@ -227,7 +232,7 @@ func getClassData{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     return (classData,);
 }
 
-@external
+@view
 func getUnitData{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     class_id: felt, unit_id: felt, metadata_id: felt
 ) -> (unitData: Values) {
@@ -392,6 +397,7 @@ func createClass{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         values_len=values_len,
         values=values,
     );
+    OPTIO.initialize_class(class_id);
     return ();
 }
 
@@ -417,5 +423,37 @@ func createUnit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         values_len=values_len,
         values=values,
     );
+    return ();
+}
+
+@view
+func getLatestUnit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt
+    ) -> (latest_unit_id: felt) {
+    let (latest_unit_id) = OPTIO.get_latest_unit_id(class_id);
+    return (latest_unit_id,);
+}
+
+@view
+func getClassProps{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt
+    ) -> (class: ClassProps) {
+    let (class: ClassProps) = OPTIO.get_class_props(class_id);
+    return (class,);
+}
+
+@view
+func getUnitProps{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, unit_id: felt
+    ) -> (unit: UnitProps) {
+    let (unit: UnitProps) = OPTIO.get_unit_props(class_id, unit_id);
+    return (unit,);
+}
+
+@external
+func updateClassLatestUnit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, latest_unit_id: felt, latest_unit_timestamp: felt
+    ) {
+    OPTIO.update_class_latest_unit(class_id, latest_unit_id, latest_unit_timestamp);
     return ();
 }
