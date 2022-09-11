@@ -421,14 +421,14 @@ func get_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return (nonce_value=nonce_value);
 }
 
-func update_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(nonce_value: felt) -> () {
-    nonce.write(nonce_value);
+func update_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(new_nonce: felt) -> () {
+    nonce.write(new_nonce);
     return ();
 }
 
 func create_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (nonce_value: felt) {
-    let (nonce: felt) = get_nonce();
-    tempvar nonce_value = nonce + 1;
-    update_nonce(nonce_value);
-    return (nonce_value=nonce_value);
+    let (prev_nonce: felt) = get_nonce();
+    tempvar new_nonce = prev_nonce + 1;
+    update_nonce(new_nonce);
+    return (nonce_value=new_nonce);
 }
