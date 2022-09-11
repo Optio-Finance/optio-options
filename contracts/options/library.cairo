@@ -250,9 +250,18 @@ namespace Options {
         ) {
         alloc_locals;
 
+        with_attr error_message("create_offer: got zero inputs lengths") {
+            assert_not_zero(metadata_ids_len);
+            assert_not_zero(values_len);
+        }
+
+        ReentrancyGuard.start(nonce);
+
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
+        let (vault_address: felt) = optio_vault.read();
         let (offer: Offer) = offers.read(nonce);
+        let (current_timestamp) = get_block_timestamp();
 
         with_attr error_message("write_option: writer's addresses don't match") {
             assert writer_address = offer.writer_address;
@@ -263,43 +272,78 @@ namespace Options {
             assert offer.is_active = TRUE;
         }
 
-        let (succeed: felt) = IOptio.transferFrom(
+        let (prev_unit_id) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
+        let unit_id = prev_unit_id + 1;
+
+        // @notice Transferring the premium from a buyer to a writer
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, premium);
+        IOptio.transferFrom(
             contract_address=optio_address,
-            sender=writer_address,
-            recipient=pool_address,
+            sender=buyer_address,
+            recipient=offer.writer_address,
             transactions_len=1,
             transactions=transactions,
         );
 
-        with_attr error_message("write_option: collateral transfer failed") {
-            assert succeed = TRUE;
-        }
+        // @notice Transferring the collateral from Optio pool to the Optio vault
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, offer.amount);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=pool_address,
+            recipient=vault_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
 
-        let (current_timestamp) = get_block_timestamp();
+        // @dev Creating the actual option
+        IOptio.createUnit(
+            contract_address=optio_address,
+            class_id=class_id,
+            unit_id=unit_id,
+            metadata_ids_len=metadata_ids_len,
+            metadata_ids=metadata_ids,
+            values_len=values_len,
+            values=values
+        );
         let option = Option(
+            class_id=offer.class_id,
+            unit_id=offer.unit_id,
             nonce=nonce,
             strike=offer.strike,
             amount=offer.amount,
             expiration=current_timestamp + offer.expiration,
+            exponentiation=offer.exponentiation,
             premium=premium,
             created=current_timestamp,
-            writer=writer_address,
-            buyer=buyer_address,
+            writer_address=writer_address,
+            buyer_address=buyer_address,
+            is_covered=TRUE,
             is_active=TRUE,
         );
         options.write(nonce, option);
+
+        // @dev Disarming the offer
         let offer = Offer(
+            class_id=offer.class_id,
+            unit_id=offer.unit_id,
             nonce=nonce,
             strike=offer.strike,
             amount=offer.amount,
             expiration=offer.expiration,
+            exponentiation=1,
             created=offer.created,
             writer_address=writer_address,
             is_matched=TRUE,
             is_active=FALSE,
         );
         offers.write(nonce, offer);
+
+        // @dev Emitting events for ME
         OptionCreated.emit(option);
+
+        ReentrancyGuard.finish(nonce);
 
         return ();
     }
