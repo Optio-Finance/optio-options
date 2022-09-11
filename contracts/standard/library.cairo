@@ -1,6 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.math import assert_not_zero, assert_not_equal, assert_le, assert_lt
 from starkware.starknet.common.syscalls import (
     get_block_timestamp,
@@ -534,6 +535,83 @@ namespace OPTIO {
         return ();
     }
 
+    func initialize_class{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, 
+        ) -> () {
+        let (class: ClassProps) = classProps.read(class_id);
+
+        with_attr error_message("initialize_class: class already exists") {
+            assert class.exists = FALSE;
+        }
+
+        let (caller: felt) = get_caller_address();
+        let (timestamp: felt) = get_block_timestamp();
+        let class = ClassProps(
+            exists=TRUE,
+            creator=caller,
+            created=timestamp,
+            latest_unit_id=FALSE,
+            latest_unit_timestamp=FALSE,
+            liquidity=FALSE,
+            total_supply=FALSE,
+        );
+        classProps.write(class_id, class);
+
+        return ();
+    }
+
+    func update_class_latest_unit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, latest_unit_id: felt, latest_unit_timestamp: felt
+        ) {
+        let (class: ClassProps) = classProps.read(class_id);
+        let (timestamp: felt) = get_block_timestamp();
+        let updated_class = ClassProps(
+            exists=class.exists,
+            creator=class.creator,
+            created=class.created,
+            latest_unit_id=latest_unit_id,
+            latest_unit_timestamp=latest_unit_timestamp,
+            liquidity=class.liquidity,
+            total_supply=class.total_supply,
+        );
+        classProps.write(class_id, class);
+        return ();
+    }
+
+    func update_class_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, liquidity: felt
+        ) {
+        let (class: ClassProps) = classProps.read(class_id);
+        let updated_class = ClassProps(
+            exists=class.exists,
+            creator=class.creator,
+            created=class.created,
+            latest_unit_id=class.latest_unit_id,
+            latest_unit_timestamp=class.latest_unit_timestamp,
+            liquidity=liquidity,
+            total_supply=class.total_supply,
+        );
+        classProps.write(class_id, class);
+        return ();
+    }
+
+    func update_class_total_supply{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, total_supply: felt
+        ) {
+        let (class: ClassProps) = classProps.read(class_id);
+        let updated_class = ClassProps(
+            exists=class.exists,
+            creator=class.creator,
+            created=class.created,
+            latest_unit_id=class.latest_unit_id,
+            latest_unit_timestamp=class.latest_unit_timestamp,
+            liquidity=class.liquidity,
+            total_supply=total_supply,
+        );
+        classProps.write(class_id, class);
+        return ();
+    }
+
     func create_unit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         index: felt,
         class_id: felt,
@@ -565,5 +643,109 @@ namespace OPTIO {
             values=values,
         );
         return ();
+    }
+
+    func initialize_unit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt
+        ) -> () {
+        let (unit: UnitProps) = unitProps.read(class_id, unit_id);
+
+        with_attr error_message("initialize_unit: unit already exists") {
+            assert unit.exists = FALSE;
+        }
+
+        let (caller: felt) = get_caller_address();
+        let (timestamp: felt) = get_block_timestamp();
+        let unit = UnitProps(
+            unit_id=unit_id,
+            exists=TRUE,
+            creator=caller,
+            created=timestamp,
+            prev_unit_id=FALSE,
+        );
+        unitProps.write(class_id, unit_id, unit);
+
+        return ();
+    }
+
+    func update_unit_prev_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt, prev_unit_id: felt
+        ) {
+        let (unit: UnitProps) = unitProps.read(class_id, unit_id);
+        let updated_unit = UnitProps(
+            unit_id=unit.unit_id,
+            exists=unit.exists,
+            creator=unit.creator,
+            created=unit.created,
+            prev_unit_id=prev_unit_id,
+        );
+        return ();
+    }
+
+    func get_class_props{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt
+        ) -> (class: ClassProps) {
+        let (class: ClassProps) = classProps.read(class_id);
+        with_attr error_message("get_class_props: class doesn't exist") {
+            assert class.exists = TRUE;
+        }
+        return (class,);
+    }
+
+    func get_unit_props{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt
+        ) -> (unit: UnitProps) {
+        let (unit: UnitProps) = unitProps.read(class_id, unit_id);
+        with_attr error_message("get_unit_props: class doesn't exist") {
+            assert unit.exists = TRUE;
+        }
+        return (unit,);
+    }
+
+    func get_latest_unit_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt
+        ) -> (latest_unit_id: felt) {
+        let (class: ClassProps) = classProps.read(class_id);
+        with_attr error_message("get_latest_unit: class doesn't exist") {
+            assert class.exists = TRUE;
+        }
+        let id = class.latest_unit_id;
+        return (latest_unit_id=id);
+    }
+
+    func class_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt
+        ) -> (exists: felt) {
+        let (class: ClassProps) = classProps.read(class_id);
+        return (exists=class.exists);
+    }
+
+    func unit_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt
+        ) -> (exists: felt) {
+        let (unit: UnitProps) = unitProps.read(class_id, unit_id);
+        return (exists=unit.exists);
+    }
+
+    func get_class_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt
+        ) -> (liquidity: felt) {
+        let (class: ClassProps) = classProps.read(class_id);
+        with_attr error_message("get_class_liquidity: class doesn't exist") {
+            assert class.exists = TRUE;
+        }
+        let liquidity = class.liquidity;
+        return (liquidity=liquidity);
+    }
+
+    func get_class_total_supply{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt
+        ) -> (total_supply: felt) {
+        let (class: ClassProps) = classProps.read(class_id);
+        with_attr error_message("get_class_total_supply: class doesn't exist") {
+            assert class.exists = TRUE;
+        }
+        let total_supply = class.total_supply;
+        return (total_supply=total_supply);
     }
 }
