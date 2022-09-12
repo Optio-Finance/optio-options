@@ -3,7 +3,8 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE, FALSE
-from starkware.cairo.common.math import assert_not_zero, assert_not_equal, assert_le, assert_lt
+from starkware.cairo.common.math import assert_not_zero, assert_lt, unsigned_div_rem
+from starkware.cairo.common.pow import pow
 from starkware.starknet.common.syscalls import (
     get_caller_address,
     get_block_timestamp,
@@ -219,7 +220,7 @@ namespace Options {
             strike=offer.strike,
             amount=offer.amount,
             expiration=offer.expiration,
-            exponentiation=1,
+            exponentiation=offer.exponentiation,
             created=offer.created,
             writer_address=offer.writer_address,
             is_matched=offer.is_matched,
@@ -332,7 +333,7 @@ namespace Options {
             strike=offer.strike,
             amount=offer.amount,
             expiration=offer.expiration,
-            exponentiation=1,
+            exponentiation=offer.exponentiation,
             created=offer.created,
             writer_address=writer_address,
             is_matched=TRUE,
@@ -414,8 +415,10 @@ namespace Options {
         ) {
         alloc_locals;
 
-        let (option: Option) = options.read(nonce);
+        let (optio_address: felt) = optio_standard.read();
+        let (vault_address: felt) = optio_vault.read();
         let (caller_address: felt) = get_caller_address();
+        let (option: Option) = options.read(nonce);
 
         with_attr error_message("exercise_option: expected buyer, got={caller_address}") {
             assert caller_address = option.buyer_address;
@@ -426,22 +429,42 @@ namespace Options {
         }
         
         // TODO oracle implementation
-        // @dev returned price should be in felt
+        // @dev returned price in felt with decimals
+        let oracle_price = 2000000000000000000000; // ETH/USD 2,000
+        let oracle_decimals = 18;
+
+        with_attr error_message("exercise_option: oracle decimals differ from option's") {
+            assert oracle_decimals = option.decimals;
+        }
+
+        let (buyer_profit, writer_return) = calculate_profit(
+            current_price=oracle_price,
+            strike_price=option.strike,
+            amount=amount,
+            decimals=oracle_decimals,
+        );
 
         ReentrancyGuard.start(nonce);
 
-        let (optio_address: felt) = optio_standard.read();
-        let (pool_address: felt) = optio_pool.read();
-
+        // @notice Sending profits to the buyer
         let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, amount);
-        assert transactions[1] = Transaction(class_id, unit_id, amount);
-
+        assert transactions[0] = Transaction(class_id, unit_id, buyer_profit);
         IOptio.transferFrom(
             contract_address=optio_address,
-            sender=pool_address,
-            recipient=caller_address,
-            transactions_len=2,
+            sender=vault_address,
+            recipient=option.buyer_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        // @notice Sending remainder to the writer
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, writer_return);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=vault_address,
+            recipient=option.writer,
+            transactions_len=1,
             transactions=transactions,
         );
 
@@ -486,4 +509,30 @@ func create_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     tempvar new_nonce = prev_nonce + 1;
     update_nonce(new_nonce);
     return (nonce_value=new_nonce);
+}
+
+func calculate_profit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        current_price: felt, strike_price: felt, amount: felt, decimals: felt
+    ) -> (buyer_profit: felt, writer_return: felt) {
+    with_attr error_message("calculate_profit: inputs can't be zeros") {
+        assert_not_zero(current_price);
+        assert_not_zero(strike_price);
+        assert_not_zero(amount);
+    }
+    with_attr error_message("calculate_profit: strike is larger than actual price") {
+        assert_lt(strike_price, current_price);
+    }
+
+    let (normalizer: felt) = pow(10, decimals);
+    let strike_price = strike_price * normalizer;
+    let delta = current_price - strike_price;
+    let surplus = delta * amount;
+    let (buyer_profit, _) = unsigned_div_rem(surplus, current_price);
+
+    with_attr error_message("calculate_profit: expected buyer_profit > 0, got {buyer_profit}") {
+        assert_not_zero(buyer_profit);
+    }
+    let writer_return = amount - buyer_profit;
+
+    return (buyer_profit, writer_return);
 }
