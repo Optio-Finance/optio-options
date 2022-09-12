@@ -1,7 +1,5 @@
 %lang starknet
 
-from contracts.options.library import Offer, Option
-
 // @title Interface for creating and managing offers and options contracts
 
 @contract_interface
