@@ -174,73 +174,6 @@ func burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return ();
 }
 
-//
-/// Getters
-//
-
-@view
-func balanceOf{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    account: felt, class_id: felt, unit_id: felt
-) -> (balance: felt) {
-    with_attr error_message("balanceOf: balance query for zero address") {
-        assert_not_zero(account);
-    }
-
-    let (balance: felt) = OPTIO.balance_of(account=account, class_id=class_id, unit_id=unit_id);
-    return (balance,);
-}
-
-@view
-func allowance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    owner: felt, spender: felt, class_id: felt, unit_id: felt
-) -> (remaining: felt) {
-    with_attr error_message("allowance: query for zero address") {
-        assert_not_zero(owner);
-        assert_not_zero(spender);
-    }
-
-    let (remaining: felt) = OPTIO.allowance(
-        owner=owner, spender=spender, class_id=class_id, unit_id=unit_id
-    );
-    return (remaining,);
-}
-
-@view
-func getClassMetadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    class_id: felt, metadata_id: felt
-) -> (classMetadata: ClassMetadata) {
-    // TODO check if classMetadata exists
-    let (classMetadata: ClassMetadata) = OPTIO.get_class_metadata(class_id, metadata_id);
-    return (classMetadata,);
-}
-
-@view
-func getUnitMetadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    class_id: felt, unit_id: felt, metadata_id: felt
-) -> (unitMetadata: UnitMetadata) {
-    // TODO check if unitMetadata exists
-    let (unitMetadata: UnitMetadata) = OPTIO.get_unit_metadata(class_id, unit_id, metadata_id);
-    return (unitMetadata,);
-}
-
-@view
-func getClassData{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    class_id: felt, metadata_id: felt
-) -> (classData: Values) {
-    // TODO check if class exists
-    let (classData: Values) = OPTIO.get_class_data(class_id, metadata_id);
-    return (classData,);
-}
-
-@view
-func getUnitData{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    class_id: felt, unit_id: felt, metadata_id: felt
-) -> (unitData: Values) {
-    // TODO check if class and unit exist
-    let (unitData: Values) = OPTIO.get_unit_data(class_id, unit_id, metadata_id);
-    return (unitData,);
-}
-
 @external
 func approve{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     owner: felt, spender: felt, transactions_len: felt, transactions: Transaction*
@@ -280,33 +213,6 @@ func setApprovalFor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     OPTIO.set_approval_for(owner, operator, approved);
     ApprovalFor.emit(owner, operator, approved);
     return ();
-}
-
-@view
-func totalSupply{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    class_id: felt, unit_id: felt
-) -> (balance: felt) {
-    alloc_locals;
-    let (caller) = get_caller_address();
-
-    let (balance) = OPTIO.total_supply(caller, class_id, unit_id);
-    return (balance,);
-}
-
-@view
-func getProgress{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    class_id: felt, unit_id: felt
-) -> (progress: felt) {
-    let (progress) = OPTIO.get_progress(class_id, unit_id);
-    return (progress,);
-}
-
-@view
-func isApprovedFor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    owner: felt, operator: felt
-) -> (approved: felt) {
-    let (approved) = OPTIO.is_approved_for(owner, operator);
-    return (approved,);
 }
 
 @external
@@ -426,6 +332,110 @@ func createUnit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     return ();
 }
 
+@external
+func updateClassLatestUnit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, latest_unit_id: felt, latest_unit_timestamp: felt
+    ) {
+    OPTIO.update_class_latest_unit(class_id, latest_unit_id, latest_unit_timestamp);
+    return ();
+}
+
+//
+//
+/// Getters
+//
+//
+
+@view
+func balanceOf{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    account: felt, class_id: felt, unit_id: felt
+) -> (balance: felt) {
+    with_attr error_message("balanceOf: balance query for zero address") {
+        assert_not_zero(account);
+    }
+
+    let (balance: felt) = OPTIO.balance_of(account=account, class_id=class_id, unit_id=unit_id);
+    return (balance,);
+}
+
+@view
+func allowance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    owner: felt, spender: felt, class_id: felt, unit_id: felt
+) -> (remaining: felt) {
+    with_attr error_message("allowance: query for zero address") {
+        assert_not_zero(owner);
+        assert_not_zero(spender);
+    }
+
+    let (remaining: felt) = OPTIO.allowance(
+        owner=owner, spender=spender, class_id=class_id, unit_id=unit_id
+    );
+    return (remaining,);
+}
+
+@view
+func getClassMetadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    class_id: felt, metadata_id: felt
+) -> (classMetadata: ClassMetadata) {
+    // TODO check if classMetadata exists
+    let (classMetadata: ClassMetadata) = OPTIO.get_class_metadata(class_id, metadata_id);
+    return (classMetadata,);
+}
+
+@view
+func getUnitMetadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    class_id: felt, unit_id: felt, metadata_id: felt
+) -> (unitMetadata: UnitMetadata) {
+    // TODO check if unitMetadata exists
+    let (unitMetadata: UnitMetadata) = OPTIO.get_unit_metadata(class_id, unit_id, metadata_id);
+    return (unitMetadata,);
+}
+
+@view
+func getClassData{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    class_id: felt, metadata_id: felt
+) -> (classData: Values) {
+    // TODO check if class exists
+    let (classData: Values) = OPTIO.get_class_data(class_id, metadata_id);
+    return (classData,);
+}
+
+@view
+func getUnitData{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    class_id: felt, unit_id: felt, metadata_id: felt
+) -> (unitData: Values) {
+    // TODO check if class and unit exist
+    let (unitData: Values) = OPTIO.get_unit_data(class_id, unit_id, metadata_id);
+    return (unitData,);
+}
+
+@view
+func totalSupply{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    class_id: felt, unit_id: felt
+) -> (balance: felt) {
+    alloc_locals;
+    let (caller) = get_caller_address();
+
+    let (balance) = OPTIO.total_supply(caller, class_id, unit_id);
+    return (balance,);
+}
+
+@view
+func getProgress{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    class_id: felt, unit_id: felt
+) -> (progress: felt) {
+    let (progress) = OPTIO.get_progress(class_id, unit_id);
+    return (progress,);
+}
+
+@view
+func isApprovedFor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    owner: felt, operator: felt
+) -> (approved: felt) {
+    let (approved) = OPTIO.is_approved_for(owner, operator);
+    return (approved,);
+}
+
 @view
 func getLatestUnit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         class_id: felt
@@ -448,12 +458,4 @@ func getUnitProps{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     ) -> (unit: UnitProps) {
     let (unit: UnitProps) = OPTIO.get_unit_props(class_id, unit_id);
     return (unit,);
-}
-
-@external
-func updateClassLatestUnit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        class_id: felt, latest_unit_id: felt, latest_unit_timestamp: felt
-    ) {
-    OPTIO.update_class_latest_unit(class_id, latest_unit_id, latest_unit_timestamp);
-    return ();
 }
