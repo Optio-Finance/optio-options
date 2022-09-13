@@ -78,6 +78,7 @@ struct Transaction {
     amount: felt,
 }
 
+
 //
 /// Storage
 //
@@ -314,50 +315,6 @@ namespace OPTIO {
         return ();
     }
 
-    func balance_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        account: felt, class_id: felt, unit_id: felt
-    ) -> (balance: felt) {
-        // TODO class and unit checks
-        let (balance) = balances.read(account, class_id, unit_id);
-        return (balance,);
-    }
-
-    func allowance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        owner: felt, spender: felt, class_id: felt, unit_id: felt
-    ) -> (remaining: felt) {
-        // TODO class and unit checks
-        let (remaining) = allowances.read(owner, class_id, unit_id, spender);
-        return (remaining,);
-    }
-
-    func get_class_metadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        class_id: felt, metadata_id: felt
-    ) -> (classMetadata: ClassMetadata) {
-        let (res) = classMetadata.read(class_id, metadata_id);
-        return (classMetadata=res);
-    }
-
-    func get_unit_metadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        class_id: felt, unit_id: felt, metadata_id: felt
-    ) -> (unitMetadata: UnitMetadata) {
-        let (res) = unitMetadata.read(class_id, unit_id, metadata_id);
-        return (unitMetadata=res);
-    }
-
-    func get_class_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        class_id: felt, metadata_id: felt
-    ) -> (classData: Values) {
-        let (classData: Values) = classes.read(class_id, metadata_id);
-        return (classData,);
-    }
-
-    func get_unit_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        class_id: felt, unit_id: felt, metadata_id: felt
-    ) -> (unitData: Values) {
-        let (unitData: Values) = units.read(class_id, unit_id, metadata_id);
-        return (unitData,);
-    }
-
     func approve{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         owner: felt,
         spender: felt,
@@ -387,27 +344,6 @@ namespace OPTIO {
     ) {
         operator_approvals.write(owner, operator, approved);
         return ();
-    }
-
-    func total_supply{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        caller: felt, class_id: felt, unit_id: felt
-    ) -> (balance: felt) {
-        let (balance) = balances.read(caller, class_id, unit_id);
-        return (balance,);
-    }
-
-    func get_progress{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        class_id: felt, unit_id: felt
-    ) -> (progress: felt) {
-        let (progress) = get_block_timestamp();
-        return (progress,);
-    }
-
-    func is_approved_for{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        owner: felt, operator: felt
-    ) -> (approved: felt) {
-        let (approved) = operator_approvals.read(owner, operator);
-        return (approved,);
     }
 
     func create_class_metadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -680,6 +616,71 @@ namespace OPTIO {
             prev_unit_id=prev_unit_id,
         );
         return ();
+    }
+
+    func balance_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        account: felt, class_id: felt, unit_id: felt
+    ) -> (balance: felt) {
+        // TODO class and unit checks
+        let (balance) = balances.read(account, class_id, unit_id);
+        return (balance,);
+    }
+
+    func allowance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        owner: felt, spender: felt, class_id: felt, unit_id: felt
+    ) -> (remaining: felt) {
+        // TODO class and unit checks
+        let (remaining) = allowances.read(owner, class_id, unit_id, spender);
+        return (remaining,);
+    }
+
+    func get_class_metadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, metadata_id: felt
+    ) -> (classMetadata: ClassMetadata) {
+        let (res) = classMetadata.read(class_id, metadata_id);
+        return (classMetadata=res);
+    }
+
+    func get_unit_metadata{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, unit_id: felt, metadata_id: felt
+    ) -> (unitMetadata: UnitMetadata) {
+        let (res) = unitMetadata.read(class_id, unit_id, metadata_id);
+        return (unitMetadata=res);
+    }
+
+    func get_class_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, metadata_id: felt
+    ) -> (classData: Values) {
+        let (classData: Values) = classes.read(class_id, metadata_id);
+        return (classData,);
+    }
+
+    func get_unit_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, unit_id: felt, metadata_id: felt
+    ) -> (unitData: Values) {
+        let (unitData: Values) = units.read(class_id, unit_id, metadata_id);
+        return (unitData,);
+    }
+
+    func total_supply{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        caller: felt, class_id: felt, unit_id: felt
+    ) -> (balance: felt) {
+        let (balance) = balances.read(caller, class_id, unit_id);
+        return (balance,);
+    }
+
+    func get_progress{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt, unit_id: felt
+    ) -> (progress: felt) {
+        let (progress) = get_block_timestamp();
+        return (progress,);
+    }
+
+    func is_approved_for{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        owner: felt, operator: felt
+    ) -> (approved: felt) {
+        let (approved) = operator_approvals.read(owner, operator);
+        return (approved,);
     }
 
     func get_class_props{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
