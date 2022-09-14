@@ -131,8 +131,8 @@ namespace Options {
     //
 
     func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        class_id: felt, strike: felt, amount: felt, expiration: felt,
-    ) {
+            class_id: felt, strike: felt, amount: felt, expiration: felt,
+        ) {
         alloc_locals;
         with_attr error_message("create_offer: details could not be zeros") {
             assert_not_zero(strike);
@@ -325,6 +325,11 @@ namespace Options {
         );
         options.write(nonce, option);
 
+        // @dev Minting LP tokens
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, offer.amount);
+        IOptio.issue(recipient=buyer_address, transactions_len=1, transactions=transactions);
+
         // @dev Disarming the offer
         let offer = Offer(
             class_id=offer.class_id,
@@ -363,7 +368,7 @@ namespace Options {
         }
         with_attr error_message("redeem_option: option is not expired yet") {
             // @dev Option expiration date + 1 day for exercising
-            assert_lt(option.expiration + 86400, current_timestamp);
+            assert_lt(option.expiration + 86400000, current_timestamp);
         }
 
         let (caller_address: felt) = get_caller_address();
