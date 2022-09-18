@@ -348,7 +348,7 @@ namespace Options {
         ) {
         alloc_locals;
 
-        with_attr error_message("create_offer: got zero inputs lengths") {
+        with_attr error_message("write_option: got zero inputs lengths") {
             assert_not_zero(metadata_ids_len);
             assert_not_zero(values_len);
         }
@@ -425,7 +425,12 @@ namespace Options {
         // @dev Minting LP tokens
         let (transactions: Transaction*) = alloc();
         assert transactions[0] = Transaction(class_id, unit_id, offer.amount);
-        IOptio.issue(recipient=buyer_address, transactions_len=1, transactions=transactions);
+        IOptio.issue(
+            contract_address=optio_address,
+            recipient=buyer_address,
+            transactions_len=1,
+            transactions=transactions
+        );
 
         // @dev Disarming the offer
         let offer = Offer(
@@ -535,10 +540,6 @@ namespace Options {
         let oracle_price = 2000000000000000000000; // ETH/USD 2,000
         let oracle_decimals = 18;
 
-        with_attr error_message("exercise_option: oracle decimals differ from option's") {
-            assert oracle_decimals = option.decimals;
-        }
-
         let (buyer_profit, writer_return) = calculate_profit(
             current_price=oracle_price,
             strike_price=option.strike,
@@ -565,7 +566,7 @@ namespace Options {
         IOptio.transferFrom(
             contract_address=optio_address,
             sender=vault_address,
-            recipient=option.writer,
+            recipient=option.writer_address,
             transactions_len=1,
             transactions=transactions,
         );
