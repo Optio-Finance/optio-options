@@ -3,7 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE, FALSE
-from starkware.cairo.common.math import assert_not_zero, assert_lt, unsigned_div_rem
+from starkware.cairo.common.math import assert_not_zero, assert_lt, assert_le, unsigned_div_rem
 from starkware.cairo.common.pow import pow
 from starkware.starknet.common.syscalls import (
     get_caller_address,
@@ -11,6 +11,7 @@ from starkware.starknet.common.syscalls import (
     get_contract_address
 )
 
+from contracts.token.IERC20 import IERC20
 from contracts.security.reentrancy_guard import ReentrancyGuard
 from contracts.standard.interfaces.IOptio import IOptio
 from contracts.standard.library import Transaction, Values
@@ -56,9 +57,24 @@ struct Option {
     is_active: felt,
 }
 
+struct SmartAccount {
+    address: felt,
+    available: felt,
+    locked: felt,
+    total_balance: felt,
+}
+
 //
 /// Events for ME callbacks
 //
+
+@event
+func DepositMade(account: SmartAccount) {
+}
+
+@event
+func DepositWithdrawn(account: SmartAccount) {
+}
 
 @event
 func OfferCreated(offer: Offer) {
