@@ -126,6 +126,49 @@ namespace Options {
         return ();
     }
 
+    func make_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            amount: felt
+        ) {
+        with_attr error_message("make_deposit: got zero amount") {
+            assert_not_zero(amount);
+        }
+        let (caller_address: felt) = get_caller_address();
+        let (erc20_address: felt) = underlying.read();
+        let (smart_account: SmartAccount) = accounts.read(caller_address);
+
+        let (deposit_success: felt) = IERC20.transferFrom(
+            contract_address=erc20_address,
+            sender=caller_address,
+            recipient=smart_account.address, // TODO smart accounts contract
+            amount=amount,
+        );
+
+        with_attr error_message("make_deposit: deposit operation failed") {
+            assert deposit_success = TRUE;
+        }
+
+        if (smart_account.address == FALSE) {
+            accounts.write(caller_address, SmartAccount(
+                address=caller_address,
+                available=amount,
+                locked=0,
+                total_balance=amount,
+            ));
+        } else {
+            accounts.write(caller_address, SmartAccount(
+                address=caller_address,
+                available=smart_account.available + amount,
+                locked=smart_account.locked,
+                total_balance=smart_account.total_balance + amount,
+            ));
+        }
+
+        let (updated_account: SmartAccount) = accounts.read(caller_address);
+        DepositMade(updated_account);
+        
+        return ();
+    }
+
     //
     // Asks (offers)
     //
