@@ -185,6 +185,44 @@ namespace Options {
         return ();
     }
 
+    func withdraw_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            amount: felt
+        ) {
+        let (caller_address: felt) = get_caller_address();
+        let (erc20_address: felt) = underlying.read();
+        let (smart_account: SmartAccount) = accounts.read(caller_address);
+
+        with_attr error_message("make_deposit: zero inputs or smart_account={smart_account}") {
+            assert_not_zero(amount);
+            assert_not_zero(smart_account.address);
+            assert_le(amount, smart_account.available);
+            assert_le(amount, smart_account.total_balance);
+        }
+
+        let (withdrawal_success: felt) = IERC20.transferFrom(
+            contract_address=erc20_address,
+            sender=smart_account.address, // TODO smart accounts contract
+            recipient=caller_address,
+            amount=amount,
+        );
+
+        with_attr error_message("withdraw_deposit: transfer failed") {
+            assert withdrawal_success = TRUE;
+        }
+
+        accounts.write(caller_address, SmartAccount(
+            address=caller_address,
+            available=smart_account.available - amount,
+            locked=smart_account.locked,
+            total_balance=smart_account.total_balance - amount,
+        ));
+
+        let (updated_account: SmartAccount) = accounts.read(caller_address);
+        DepositWithdrawn(updated_account);
+
+        return ();
+    }
+
     //
     // Asks (offers)
     //
