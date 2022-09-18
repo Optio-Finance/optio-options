@@ -3,7 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE, FALSE
-from starkware.cairo.common.math import assert_not_zero, assert_lt, unsigned_div_rem
+from starkware.cairo.common.math import assert_not_zero, assert_lt, assert_le, unsigned_div_rem
 from starkware.cairo.common.pow import pow
 from starkware.starknet.common.syscalls import (
     get_caller_address,
@@ -11,6 +11,7 @@ from starkware.starknet.common.syscalls import (
     get_contract_address
 )
 
+from contracts.token.IERC20 import IERC20
 from contracts.security.reentrancy_guard import ReentrancyGuard
 from contracts.standard.interfaces.IOptio import IOptio
 from contracts.standard.library import Transaction, Values
@@ -56,9 +57,24 @@ struct Option {
     is_active: felt,
 }
 
+struct SmartAccount {
+    address: felt,
+    available: felt,
+    locked: felt,
+    total_balance: felt,
+}
+
 //
 /// Events for ME callbacks
 //
+
+@event
+func DepositMade(account: SmartAccount) {
+}
+
+@event
+func DepositWithdrawn(account: SmartAccount) {
+}
 
 @event
 func OfferCreated(offer: Offer) {
@@ -123,6 +139,87 @@ namespace Options {
         optio_standard.write(optio_address);
         optio_pool.write(pool_address);
         class.write(class_id);
+        return ();
+    }
+
+    func make_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            amount: felt
+        ) {
+        with_attr error_message("make_deposit: got zero amount") {
+            assert_not_zero(amount);
+        }
+        let (caller_address: felt) = get_caller_address();
+        let (erc20_address: felt) = underlying.read();
+        let (smart_account: SmartAccount) = accounts.read(caller_address);
+
+        let (deposit_success: felt) = IERC20.transferFrom(
+            contract_address=erc20_address,
+            sender=caller_address,
+            recipient=smart_account.address, // TODO smart accounts contract
+            amount=amount,
+        );
+
+        with_attr error_message("make_deposit: deposit operation failed") {
+            assert deposit_success = TRUE;
+        }
+
+        if (smart_account.address == FALSE) {
+            accounts.write(caller_address, SmartAccount(
+                address=caller_address,
+                available=amount,
+                locked=0,
+                total_balance=amount,
+            ));
+        } else {
+            accounts.write(caller_address, SmartAccount(
+                address=caller_address,
+                available=smart_account.available + amount,
+                locked=smart_account.locked,
+                total_balance=smart_account.total_balance + amount,
+            ));
+        }
+
+        let (updated_account: SmartAccount) = accounts.read(caller_address);
+        DepositMade(updated_account);
+        
+        return ();
+    }
+
+    func withdraw_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            amount: felt
+        ) {
+        let (caller_address: felt) = get_caller_address();
+        let (erc20_address: felt) = underlying.read();
+        let (smart_account: SmartAccount) = accounts.read(caller_address);
+
+        with_attr error_message("make_deposit: zero inputs or smart_account={smart_account}") {
+            assert_not_zero(amount);
+            assert_not_zero(smart_account.address);
+            assert_le(amount, smart_account.available);
+            assert_le(amount, smart_account.total_balance);
+        }
+
+        let (withdrawal_success: felt) = IERC20.transferFrom(
+            contract_address=erc20_address,
+            sender=smart_account.address, // TODO smart accounts contract
+            recipient=caller_address,
+            amount=amount,
+        );
+
+        with_attr error_message("withdraw_deposit: transfer failed") {
+            assert withdrawal_success = TRUE;
+        }
+
+        accounts.write(caller_address, SmartAccount(
+            address=caller_address,
+            available=smart_account.available - amount,
+            locked=smart_account.locked,
+            total_balance=smart_account.total_balance - amount,
+        ));
+
+        let (updated_account: SmartAccount) = accounts.read(caller_address);
+        DepositWithdrawn(updated_account);
+
         return ();
     }
 
@@ -251,7 +348,7 @@ namespace Options {
         ) {
         alloc_locals;
 
-        with_attr error_message("create_offer: got zero inputs lengths") {
+        with_attr error_message("write_option: got zero inputs lengths") {
             assert_not_zero(metadata_ids_len);
             assert_not_zero(values_len);
         }
@@ -328,7 +425,12 @@ namespace Options {
         // @dev Minting LP tokens
         let (transactions: Transaction*) = alloc();
         assert transactions[0] = Transaction(class_id, unit_id, offer.amount);
-        IOptio.issue(recipient=buyer_address, transactions_len=1, transactions=transactions);
+        IOptio.issue(
+            contract_address=optio_address,
+            recipient=buyer_address,
+            transactions_len=1,
+            transactions=transactions
+        );
 
         // @dev Disarming the offer
         let offer = Offer(
@@ -438,10 +540,6 @@ namespace Options {
         let oracle_price = 2000000000000000000000; // ETH/USD 2,000
         let oracle_decimals = 18;
 
-        with_attr error_message("exercise_option: oracle decimals differ from option's") {
-            assert oracle_decimals = option.decimals;
-        }
-
         let (buyer_profit, writer_return) = calculate_profit(
             current_price=oracle_price,
             strike_price=option.strike,
@@ -468,7 +566,7 @@ namespace Options {
         IOptio.transferFrom(
             contract_address=optio_address,
             sender=vault_address,
-            recipient=option.writer,
+            recipient=option.writer_address,
             transactions_len=1,
             transactions=transactions,
         );
