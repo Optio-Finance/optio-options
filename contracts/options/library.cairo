@@ -241,8 +241,6 @@ namespace Options {
     func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, strike: felt, amount: felt, expiration: felt,
         ) {
-        Ownable.assert_only_VME();
-
         with_attr error_message("create_offer: details could not be zeros") {
             assert_not_zero(strike);
             assert_not_zero(amount);
