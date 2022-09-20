@@ -346,6 +346,44 @@ namespace Options {
     // Option instance methods
     //
 
+    func trade_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt,
+            strike: felt,
+            amount: felt,
+            expiration: felt,
+            exponentiation: felt,
+            option_writer: SmartAccount,
+            option_buyer: SmartAccount,
+            collateral: felt,
+            premium: felt,
+            metadata_ids_len: felt,
+            metadata_ids: felt*,
+            values_len: felt,
+            values: Values*,
+        ) {
+        Ownable.assert_only_VME();
+
+        with_attr error_message("create_offer: got zero inputs lengths") {
+            assert_not_zero(metadata_ids_len);
+            assert_not_zero(values_len);
+        }
+
+        let (nonce: felt) = create_nonce();
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
+        let (vault_address: felt) = optio_vault.read();
+        let (current_timestamp) = get_block_timestamp();
+
+        ReentrancyGuard.start(nonce);
+
+        let (prev_unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
+        let unit_id = prev_unit_id + 1;
+
+        ReentrancyGuard.finish(nonce);
+
+        return ();
+    }
+
     func write_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             nonce: felt,
             class_id: felt,
