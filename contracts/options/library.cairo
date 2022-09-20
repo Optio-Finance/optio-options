@@ -399,6 +399,33 @@ namespace Options {
             transactions=transactions,
         );
 
+        // @dev Creating the actual option
+        IOptio.createUnit(
+            contract_address=optio_address,
+            class_id=class_id,
+            unit_id=unit_id,
+            metadata_ids_len=metadata_ids_len,
+            metadata_ids=metadata_ids,
+            values_len=values_len,
+            values=values
+        );
+        let option = Option(
+            class_id=class_id,
+            unit_id=unit_id,
+            nonce=nonce,
+            strike=strike,
+            amount=amount,
+            expiration=current_timestamp + expiration,
+            exponentiation=exponentiation,
+            premium=premium,
+            created=current_timestamp,
+            writer_address=option_writer.account_address,
+            buyer_address=option_buyer.account_address,
+            is_covered=TRUE,
+            is_active=TRUE,
+        );
+        options.write(nonce, option);
+
         ReentrancyGuard.finish(nonce);
 
         return ();
