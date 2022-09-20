@@ -389,6 +389,16 @@ namespace Options {
             transactions=transactions,
         );
 
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, premium);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=option_buyer.account_address,
+            recipient=option_writer.account_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
         ReentrancyGuard.finish(nonce);
 
         return ();
