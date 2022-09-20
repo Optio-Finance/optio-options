@@ -436,6 +436,9 @@ namespace Options {
             transactions=transactions
         );
 
+        // @dev Emitting events for ME
+        OptionCreated.emit(option);
+
         ReentrancyGuard.finish(nonce);
 
         return ();
