@@ -59,7 +59,8 @@ struct Option {
 }
 
 struct SmartAccount {
-    address: felt,
+    wallet_address: felt,
+    account_address: felt,
     available: felt,
     locked: felt,
     total_balance: felt,
@@ -195,7 +196,7 @@ namespace Options {
         return ();
     }
 
-    func withdraw_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    func make_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             amount: felt
         ) {
         let (caller_address: felt) = get_caller_address();
@@ -240,8 +241,6 @@ namespace Options {
     func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, strike: felt, amount: felt, expiration: felt,
         ) {
-        Ownable.assert_only_VME();
-
         with_attr error_message("create_offer: details could not be zeros") {
             assert_not_zero(strike);
             assert_not_zero(amount);
@@ -345,6 +344,104 @@ namespace Options {
     //
     // Option instance methods
     //
+
+    func trade_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt,
+            strike: felt,
+            amount: felt,
+            expiration: felt,
+            exponentiation: felt,
+            option_writer: SmartAccount,
+            option_buyer: SmartAccount,
+            collateral: felt,
+            premium: felt,
+            metadata_ids_len: felt,
+            metadata_ids: felt*,
+            values_len: felt,
+            values: Values*,
+        ) {
+        Ownable.assert_only_VME();
+
+        with_attr error_message("create_offer: got zero inputs lengths") {
+            assert_not_zero(metadata_ids_len);
+            assert_not_zero(values_len);
+        }
+
+        let (nonce: felt) = create_nonce();
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
+        let (vault_address: felt) = optio_vault.read();
+        let (current_timestamp) = get_block_timestamp();
+
+        ReentrancyGuard.start(nonce);
+
+        let (prev_unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
+        let unit_id = prev_unit_id + 1;
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, collateral);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=option_writer.account_address,
+            recipient=vault_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, premium);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=option_buyer.account_address,
+            recipient=option_writer.account_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        // @dev Creating the actual option
+        IOptio.createUnit(
+            contract_address=optio_address,
+            class_id=class_id,
+            unit_id=unit_id,
+            metadata_ids_len=metadata_ids_len,
+            metadata_ids=metadata_ids,
+            values_len=values_len,
+            values=values
+        );
+        let option = Option(
+            class_id=class_id,
+            unit_id=unit_id,
+            nonce=nonce,
+            strike=strike,
+            amount=amount,
+            expiration=current_timestamp + expiration,
+            exponentiation=exponentiation,
+            premium=premium,
+            created=current_timestamp,
+            writer_address=option_writer.account_address,
+            buyer_address=option_buyer.account_address,
+            is_covered=TRUE,
+            is_active=TRUE,
+        );
+        options.write(nonce, option);
+
+        // @dev Minting LP tokens
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
+        IOptio.issue(
+            contract_address=optio_address,
+            recipient=option_buyer.account_address,
+            transactions_len=1,
+            transactions=transactions
+        );
+
+        // @dev Emitting events for ME
+        OptionCreated.emit(option);
+
+        ReentrancyGuard.finish(nonce);
+
+        return ();
+    }
 
     func write_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             nonce: felt,
