@@ -59,7 +59,8 @@ struct Option {
 }
 
 struct SmartAccount {
-    address: felt,
+    wallet_address: felt,
+    account_address: felt,
     available: felt,
     locked: felt,
     total_balance: felt,
