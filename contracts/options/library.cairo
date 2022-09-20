@@ -195,7 +195,7 @@ namespace Options {
         return ();
     }
 
-    func withdraw_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    func make_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             amount: felt
         ) {
         let (caller_address: felt) = get_caller_address();
