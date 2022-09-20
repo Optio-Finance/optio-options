@@ -4,6 +4,13 @@ from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 
+//
+// Events
+//
+
+@event
+func OwnershipTransferred(previousOwner: felt, newOwner: felt) {
+}
 
 //
 // Storage
@@ -73,6 +80,7 @@ namespace Ownable {
     ) {
         let (previous_owner: felt) = Ownable.owner();
         Ownable_owner.write(new_owner);
+        OwnershipTransferred.emit(previous_owner, new_owner);
         return ();
     }
 }
