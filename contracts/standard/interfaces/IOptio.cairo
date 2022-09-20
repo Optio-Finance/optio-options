@@ -91,7 +91,7 @@ namespace IOptio {
     }
 
     func createUnit(
-            class_id: felt, unit_id: felt, metadata_ids_len: felt, metadata_ids: felt, values_len: felt, values: Values*
+            class_id: felt, unit_id: felt, metadata_ids_len: felt, metadata_ids: felt*, values_len: felt, values: Values*
         ) {
     }
 
