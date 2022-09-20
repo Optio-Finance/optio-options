@@ -426,6 +426,16 @@ namespace Options {
         );
         options.write(nonce, option);
 
+        // @dev Minting LP tokens
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
+        IOptio.issue(
+            contract_address=optio_address,
+            recipient=option_buyer.account_address,
+            transactions_len=1,
+            transactions=transactions
+        );
+
         ReentrancyGuard.finish(nonce);
 
         return ();
