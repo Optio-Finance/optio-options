@@ -13,6 +13,7 @@ from starkware.starknet.common.syscalls import (
 
 from contracts.token.IERC20 import IERC20
 from contracts.security.reentrancy_guard import ReentrancyGuard
+from contracts.security.ownable import Ownable
 from contracts.standard.interfaces.IOptio import IOptio
 from contracts.standard.library import Transaction, Values
 
@@ -239,7 +240,8 @@ namespace Options {
     func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, strike: felt, amount: felt, expiration: felt,
         ) {
-        alloc_locals;
+        Ownable.assert_only_VME();
+
         with_attr error_message("create_offer: details could not be zeros") {
             assert_not_zero(strike);
             assert_not_zero(amount);
