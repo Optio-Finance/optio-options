@@ -16,6 +16,8 @@ from contracts.security.reentrancy_guard import ReentrancyGuard
 from contracts.security.ownable import Ownable
 from contracts.standard.interfaces.IOptio import IOptio
 from contracts.standard.library import Transaction, Values
+from contracts.oracles.empiric import IEmpiricOracle, EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE
+
 
 // @notice Offer data goes into Matching Engine
 // @dev No obligations at this stage
@@ -633,19 +635,22 @@ namespace Options {
         let (optio_address: felt) = optio_standard.read();
         let (vault_address: felt) = optio_vault.read();
         let (option: Option) = options.read(nonce);
-
-        with_attr error_message("exercise_option: expected buyer, got={caller_address}") {
-            assert caller_address = option.buyer_address;
-        }
+        let (current_timestamp) = get_block_timestamp();
 
         with_attr error_message("exercise_option: option is not active") {
             assert option.is_active = TRUE;
         }
-        
-        // TODO oracle implementation
-        // @dev returned price in felt with decimals
-        let oracle_price = 2000000000000000000000; // ETH/USD 2,000
-        let oracle_decimals = 18;
+
+        let (
+            oracle_price,
+            oracle_decimals,
+            last_updated_timestamp, // UNIX format, in seconds since epoch
+            num_sources_aggregated
+        ) = IEmpiricOracle.get_value(EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE);
+
+        with_attr error_message("exercise_option: out of time constraints") {
+            assert_lt(current_timestamp, last_updated_timestamp + 300); // 5 min window
+        }
 
         let (buyer_profit, writer_return) = calculate_profit(
             current_price=oracle_price,
