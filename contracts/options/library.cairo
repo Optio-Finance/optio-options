@@ -632,7 +632,6 @@ namespace Options {
 
         let (optio_address: felt) = optio_standard.read();
         let (vault_address: felt) = optio_vault.read();
-        let (caller_address: felt) = get_caller_address();
         let (option: Option) = options.read(nonce);
 
         with_attr error_message("exercise_option: expected buyer, got={caller_address}") {
