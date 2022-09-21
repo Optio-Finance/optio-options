@@ -628,7 +628,7 @@ namespace Options {
     func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, unit_id: felt, nonce: felt, amount: felt
         ) {
-        alloc_locals;
+        Ownable.assert_only_VME();
 
         let (optio_address: felt) = optio_standard.read();
         let (vault_address: felt) = optio_vault.read();
