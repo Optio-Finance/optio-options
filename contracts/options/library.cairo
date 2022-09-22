@@ -237,113 +237,6 @@ namespace Options {
     }
 
     //
-    // Asks (offers)
-    //
-
-    func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            class_id: felt, strike: felt, amount: felt, expiration: felt,
-        ) {
-        with_attr error_message("create_offer: details could not be zeros") {
-            assert_not_zero(strike);
-            assert_not_zero(amount);
-            assert_not_zero(expiration);
-        }
-
-        // @notice Initiating the full collateralization of the call option
-        // @notice Currently it's full covered call (will change in next versions)
-        let (nonce: felt) = create_nonce();
-        let (current_timestamp: felt) = get_block_timestamp();
-        let (caller_address: felt) = get_caller_address();
-        let (optio_address: felt) = optio_standard.read();
-        let (pool_address: felt) = optio_pool.read();
-        let (unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
-
-        // @dev The batch here always contains a single micro-transaction
-        // @dev But in practice a batch can contain hundreds of micro-transactions
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, amount);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=caller_address,
-            recipient=pool_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        let offer = Offer(
-            class_id=class_id,
-            unit_id=unit_id,
-            nonce=nonce,
-            strike=strike,
-            amount=amount,
-            expiration=expiration,
-            exponentiation=1,
-            created=current_timestamp,
-            writer_address=caller_address,
-            is_matched=FALSE,
-            is_active=TRUE,
-        );
-        offers.write(nonce, offer);
-
-        // @dev Ready to get matched, emitting event for ME
-        OfferCreated.emit(offer);
-
-        return ();
-    }
-
-    func cancel_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            class_id: felt, unit_id: felt, nonce: felt, amount: felt
-        ) {
-        alloc_locals;
-
-        let (offer: Offer) = offers.read(nonce);
-        let (optio_address: felt) = optio_standard.read();
-        let (pool_address: felt) = optio_pool.read();
-        let (caller_address: felt) = get_caller_address();
-
-        with_attr error_message("cancel_offer: only writer can cancel") {
-            assert caller_address = offer.writer_address;
-        }
-
-        with_attr error_message("cancel_offer: offer was matched or not active") {
-            assert offer.is_active = TRUE;
-            assert offer.is_matched = FALSE;
-        }
-
-        ReentrancyGuard.start(nonce);
-
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, amount);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=pool_address,
-            recipient=caller_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        let offer = Offer(
-            class_id=offer.class_id,
-            unit_id=offer.unit_id,
-            nonce=nonce,
-            strike=offer.strike,
-            amount=offer.amount,
-            expiration=offer.expiration,
-            exponentiation=offer.exponentiation,
-            created=offer.created,
-            writer_address=offer.writer_address,
-            is_matched=offer.is_matched,
-            is_active=FALSE,
-        );
-        offers.write(nonce, offer);
-        OfferCancelled.emit(offer);
-
-        ReentrancyGuard.finish(nonce);
-
-        return ();
-    }
-
-    //
     // Option instance methods
     //
 
@@ -693,6 +586,113 @@ namespace Options {
         );
         options.write(nonce, option);
         OptionExercised.emit(option);
+
+        ReentrancyGuard.finish(nonce);
+
+        return ();
+    }
+
+    //
+    // Asks (offers)
+    //
+
+    func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, strike: felt, amount: felt, expiration: felt,
+        ) {
+        with_attr error_message("create_offer: details could not be zeros") {
+            assert_not_zero(strike);
+            assert_not_zero(amount);
+            assert_not_zero(expiration);
+        }
+
+        // @notice Initiating the full collateralization of the call option
+        // @notice Currently it's full covered call (will change in next versions)
+        let (nonce: felt) = create_nonce();
+        let (current_timestamp: felt) = get_block_timestamp();
+        let (caller_address: felt) = get_caller_address();
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
+        let (unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
+
+        // @dev The batch here always contains a single micro-transaction
+        // @dev But in practice a batch can contain hundreds of micro-transactions
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=caller_address,
+            recipient=pool_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        let offer = Offer(
+            class_id=class_id,
+            unit_id=unit_id,
+            nonce=nonce,
+            strike=strike,
+            amount=amount,
+            expiration=expiration,
+            exponentiation=1,
+            created=current_timestamp,
+            writer_address=caller_address,
+            is_matched=FALSE,
+            is_active=TRUE,
+        );
+        offers.write(nonce, offer);
+
+        // @dev Ready to get matched, emitting event for ME
+        OfferCreated.emit(offer);
+
+        return ();
+    }
+
+    func cancel_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt, nonce: felt, amount: felt
+        ) {
+        alloc_locals;
+
+        let (offer: Offer) = offers.read(nonce);
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
+        let (caller_address: felt) = get_caller_address();
+
+        with_attr error_message("cancel_offer: only writer can cancel") {
+            assert caller_address = offer.writer_address;
+        }
+
+        with_attr error_message("cancel_offer: offer was matched or not active") {
+            assert offer.is_active = TRUE;
+            assert offer.is_matched = FALSE;
+        }
+
+        ReentrancyGuard.start(nonce);
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=pool_address,
+            recipient=caller_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        let offer = Offer(
+            class_id=offer.class_id,
+            unit_id=offer.unit_id,
+            nonce=nonce,
+            strike=offer.strike,
+            amount=offer.amount,
+            expiration=offer.expiration,
+            exponentiation=offer.exponentiation,
+            created=offer.created,
+            writer_address=offer.writer_address,
+            is_matched=offer.is_matched,
+            is_active=FALSE,
+        );
+        offers.write(nonce, offer);
+        OfferCancelled.emit(offer);
 
         ReentrancyGuard.finish(nonce);
 
