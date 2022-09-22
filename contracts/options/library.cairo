@@ -570,7 +570,7 @@ namespace Options {
     func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, unit_id: felt, nonce: felt
         ) {
-        alloc_locals;
+        Ownable.assert_only_VME();
 
         let (option: Option) = options.read(nonce);
         let (current_timestamp: felt) = get_block_timestamp();
@@ -579,14 +579,7 @@ namespace Options {
             assert option.is_active = TRUE;
         }
         with_attr error_message("redeem_option: option is not expired yet") {
-            // @dev Option expiration date + 1 day for exercising
-            assert_lt(option.expiration + 86400000, current_timestamp);
-        }
-
-        let (caller_address: felt) = get_caller_address();
-
-        with_attr error_message("redeem_option: writer only") {
-            assert caller_address = option.writer_address;
+            assert_lt(option.expiration, current_timestamp);
         }
 
         ReentrancyGuard.start(nonce);
@@ -599,7 +592,7 @@ namespace Options {
         IOptio.transferFrom(
             contract_address=optio_address,
             sender=pool_address,
-            recipient=caller_address,
+            recipient=option.writer_address,
             transactions_len=1,
             transactions=transactions,
         );
