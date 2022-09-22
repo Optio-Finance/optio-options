@@ -338,60 +338,6 @@ namespace Options {
         return ();
     }
 
-    // @notice In case if expired by not exercised
-    func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            class_id: felt, unit_id: felt, nonce: felt
-        ) {
-        Ownable.assert_only_VME();
-
-        let (option: Option) = options.read(nonce);
-        let (current_timestamp: felt) = get_block_timestamp();
-
-        with_attr error_message("redeem_option: option has been set inactive") {
-            assert option.is_active = TRUE;
-        }
-        with_attr error_message("redeem_option: option is not expired yet") {
-            assert_lt(option.expiration, current_timestamp);
-        }
-
-        ReentrancyGuard.start(nonce);
-
-        let (optio_address: felt) = optio_standard.read();
-        let (pool_address: felt) = optio_pool.read();
-
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, option.amount);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=pool_address,
-            recipient=option.writer_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        let option = Option(
-            class_id=option.class_id,
-            unit_id=option.unit_id,
-            nonce=nonce,
-            strike=option.strike,
-            amount=option.amount,
-            expiration=option.expiration,
-            exponentiation=option.exponentiation,
-            premium=option.premium,
-            created=option.created,
-            writer_address=option.writer_address,
-            buyer_address=option.buyer_address,
-            is_covered=option.is_covered,
-            is_active=FALSE,
-        );
-        options.write(nonce, option);
-        OptionRedeemed.emit(option);
-
-        ReentrancyGuard.finish(nonce);
-
-        return ();
-    }
-
     func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, unit_id: felt, nonce: felt, amount: felt
         ) {
@@ -465,6 +411,60 @@ namespace Options {
         );
         options.write(nonce, option);
         OptionExercised.emit(option);
+
+        ReentrancyGuard.finish(nonce);
+
+        return ();
+    }
+
+    // @notice In case if expired by not exercised
+    func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt, nonce: felt
+        ) {
+        Ownable.assert_only_VME();
+
+        let (option: Option) = options.read(nonce);
+        let (current_timestamp: felt) = get_block_timestamp();
+
+        with_attr error_message("redeem_option: option has been set inactive") {
+            assert option.is_active = TRUE;
+        }
+        with_attr error_message("redeem_option: option is not expired yet") {
+            assert_lt(option.expiration, current_timestamp);
+        }
+
+        ReentrancyGuard.start(nonce);
+
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, option.amount);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=pool_address,
+            recipient=option.writer_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        let option = Option(
+            class_id=option.class_id,
+            unit_id=option.unit_id,
+            nonce=nonce,
+            strike=option.strike,
+            amount=option.amount,
+            expiration=option.expiration,
+            exponentiation=option.exponentiation,
+            premium=option.premium,
+            created=option.created,
+            writer_address=option.writer_address,
+            buyer_address=option.buyer_address,
+            is_covered=option.is_covered,
+            is_active=FALSE,
+        );
+        options.write(nonce, option);
+        OptionRedeemed.emit(option);
 
         ReentrancyGuard.finish(nonce);
 
