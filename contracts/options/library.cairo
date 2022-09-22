@@ -237,6 +237,241 @@ namespace Options {
     }
 
     //
+    // Option instance methods
+    //
+
+    func trade_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt,
+            strike: felt,
+            amount: felt,
+            expiration: felt,
+            exponentiation: felt,
+            option_writer: SmartAccount,
+            option_buyer: SmartAccount,
+            collateral: felt,
+            premium: felt,
+            metadata_ids_len: felt,
+            metadata_ids: felt*,
+            values_len: felt,
+            values: Values*,
+        ) {
+        Ownable.assert_only_VME();
+
+        with_attr error_message("create_offer: got zero inputs lengths") {
+            assert_not_zero(metadata_ids_len);
+            assert_not_zero(values_len);
+        }
+
+        let (nonce: felt) = create_nonce();
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
+        let (vault_address: felt) = optio_vault.read();
+        let (current_timestamp) = get_block_timestamp();
+
+        ReentrancyGuard.start(nonce);
+
+        let (prev_unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
+        let unit_id = prev_unit_id + 1;
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, collateral);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=option_writer.account_address,
+            recipient=vault_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, premium);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=option_buyer.account_address,
+            recipient=option_writer.account_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        // @dev Creating the actual option
+        IOptio.createUnit(
+            contract_address=optio_address,
+            class_id=class_id,
+            unit_id=unit_id,
+            metadata_ids_len=metadata_ids_len,
+            metadata_ids=metadata_ids,
+            values_len=values_len,
+            values=values
+        );
+        let option = Option(
+            class_id=class_id,
+            unit_id=unit_id,
+            nonce=nonce,
+            strike=strike,
+            amount=amount,
+            expiration=current_timestamp + expiration,
+            exponentiation=exponentiation,
+            premium=premium,
+            created=current_timestamp,
+            writer_address=option_writer.account_address,
+            buyer_address=option_buyer.account_address,
+            is_covered=TRUE,
+            is_active=TRUE,
+        );
+        options.write(nonce, option);
+
+        // @dev Minting LP tokens
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, amount);
+        IOptio.issue(
+            contract_address=optio_address,
+            recipient=option_buyer.account_address,
+            transactions_len=1,
+            transactions=transactions
+        );
+
+        // @dev Emitting events for ME
+        OptionCreated.emit(option);
+
+        ReentrancyGuard.finish(nonce);
+
+        return ();
+    }
+
+    func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt, nonce: felt, amount: felt
+        ) {
+        Ownable.assert_only_VME();
+
+        let (optio_address: felt) = optio_standard.read();
+        let (vault_address: felt) = optio_vault.read();
+        let (option: Option) = options.read(nonce);
+        let (current_timestamp) = get_block_timestamp();
+
+        with_attr error_message("exercise_option: option is not active") {
+            assert option.is_active = TRUE;
+        }
+
+        let (
+            oracle_price,
+            oracle_decimals,
+            last_updated_timestamp, // UNIX format, in seconds since epoch
+            num_sources_aggregated
+        ) = IEmpiricOracle.get_value(EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE);
+
+        with_attr error_message("exercise_option: out of time constraints") {
+            assert_lt(current_timestamp, last_updated_timestamp + 300); // 5 min window
+        }
+
+        let (buyer_profit, writer_return) = calculate_profit(
+            current_price=oracle_price,
+            strike_price=option.strike,
+            amount=amount,
+            decimals=oracle_decimals,
+        );
+
+        ReentrancyGuard.start(nonce);
+
+        // @notice Sending profits to the buyer
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, buyer_profit);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=vault_address,
+            recipient=option.buyer_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        // @notice Sending remainder to the writer
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, writer_return);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=vault_address,
+            recipient=option.writer_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        let option = Option(
+            class_id=option.class_id,
+            unit_id=option.unit_id,
+            nonce=nonce,
+            strike=option.strike,
+            amount=option.amount,
+            expiration=option.expiration,
+            exponentiation=option.exponentiation,
+            premium=option.premium,
+            created=option.created,
+            writer_address=option.writer_address,
+            buyer_address=option.buyer_address,
+            is_covered=option.is_covered,
+            is_active=FALSE,
+        );
+        options.write(nonce, option);
+        OptionExercised.emit(option);
+
+        ReentrancyGuard.finish(nonce);
+
+        return ();
+    }
+
+    // @notice In case if expired by not exercised
+    func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt, nonce: felt
+        ) {
+        Ownable.assert_only_VME();
+
+        let (option: Option) = options.read(nonce);
+        let (current_timestamp: felt) = get_block_timestamp();
+
+        with_attr error_message("redeem_option: option has been set inactive") {
+            assert option.is_active = TRUE;
+        }
+        with_attr error_message("redeem_option: option is not expired yet") {
+            assert_lt(option.expiration, current_timestamp);
+        }
+
+        ReentrancyGuard.start(nonce);
+
+        let (optio_address: felt) = optio_standard.read();
+        let (pool_address: felt) = optio_pool.read();
+
+        let (transactions: Transaction*) = alloc();
+        assert transactions[0] = Transaction(class_id, unit_id, option.amount);
+        IOptio.transferFrom(
+            contract_address=optio_address,
+            sender=pool_address,
+            recipient=option.writer_address,
+            transactions_len=1,
+            transactions=transactions,
+        );
+
+        let option = Option(
+            class_id=option.class_id,
+            unit_id=option.unit_id,
+            nonce=nonce,
+            strike=option.strike,
+            amount=option.amount,
+            expiration=option.expiration,
+            exponentiation=option.exponentiation,
+            premium=option.premium,
+            created=option.created,
+            writer_address=option.writer_address,
+            buyer_address=option.buyer_address,
+            is_covered=option.is_covered,
+            is_active=FALSE,
+        );
+        options.write(nonce, option);
+        OptionRedeemed.emit(option);
+
+        ReentrancyGuard.finish(nonce);
+
+        return ();
+    }
+
+    //
     // Asks (offers)
     //
 
@@ -337,108 +572,6 @@ namespace Options {
         );
         offers.write(nonce, offer);
         OfferCancelled.emit(offer);
-
-        ReentrancyGuard.finish(nonce);
-
-        return ();
-    }
-
-    //
-    // Option instance methods
-    //
-
-    func trade_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            class_id: felt,
-            strike: felt,
-            amount: felt,
-            expiration: felt,
-            exponentiation: felt,
-            option_writer: SmartAccount,
-            option_buyer: SmartAccount,
-            collateral: felt,
-            premium: felt,
-            metadata_ids_len: felt,
-            metadata_ids: felt*,
-            values_len: felt,
-            values: Values*,
-        ) {
-        Ownable.assert_only_VME();
-
-        with_attr error_message("create_offer: got zero inputs lengths") {
-            assert_not_zero(metadata_ids_len);
-            assert_not_zero(values_len);
-        }
-
-        let (nonce: felt) = create_nonce();
-        let (optio_address: felt) = optio_standard.read();
-        let (pool_address: felt) = optio_pool.read();
-        let (vault_address: felt) = optio_vault.read();
-        let (current_timestamp) = get_block_timestamp();
-
-        ReentrancyGuard.start(nonce);
-
-        let (prev_unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
-        let unit_id = prev_unit_id + 1;
-
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, collateral);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=option_writer.account_address,
-            recipient=vault_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, premium);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=option_buyer.account_address,
-            recipient=option_writer.account_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        // @dev Creating the actual option
-        IOptio.createUnit(
-            contract_address=optio_address,
-            class_id=class_id,
-            unit_id=unit_id,
-            metadata_ids_len=metadata_ids_len,
-            metadata_ids=metadata_ids,
-            values_len=values_len,
-            values=values
-        );
-        let option = Option(
-            class_id=class_id,
-            unit_id=unit_id,
-            nonce=nonce,
-            strike=strike,
-            amount=amount,
-            expiration=current_timestamp + expiration,
-            exponentiation=exponentiation,
-            premium=premium,
-            created=current_timestamp,
-            writer_address=option_writer.account_address,
-            buyer_address=option_buyer.account_address,
-            is_covered=TRUE,
-            is_active=TRUE,
-        );
-        options.write(nonce, option);
-
-        // @dev Minting LP tokens
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, amount);
-        IOptio.issue(
-            contract_address=optio_address,
-            recipient=option_buyer.account_address,
-            transactions_len=1,
-            transactions=transactions
-        );
-
-        // @dev Emitting events for ME
-        OptionCreated.emit(option);
 
         ReentrancyGuard.finish(nonce);
 
@@ -560,146 +693,6 @@ namespace Options {
 
         // @dev Emitting events for ME
         OptionCreated.emit(option);
-
-        ReentrancyGuard.finish(nonce);
-
-        return ();
-    }
-
-    // @notice In case if expired by not exercised
-    func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            class_id: felt, unit_id: felt, nonce: felt
-        ) {
-        alloc_locals;
-
-        let (option: Option) = options.read(nonce);
-        let (current_timestamp: felt) = get_block_timestamp();
-
-        with_attr error_message("redeem_option: option has been set inactive") {
-            assert option.is_active = TRUE;
-        }
-        with_attr error_message("redeem_option: option is not expired yet") {
-            // @dev Option expiration date + 1 day for exercising
-            assert_lt(option.expiration + 86400000, current_timestamp);
-        }
-
-        let (caller_address: felt) = get_caller_address();
-
-        with_attr error_message("redeem_option: writer only") {
-            assert caller_address = option.writer_address;
-        }
-
-        ReentrancyGuard.start(nonce);
-
-        let (optio_address: felt) = optio_standard.read();
-        let (pool_address: felt) = optio_pool.read();
-
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, option.amount);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=pool_address,
-            recipient=caller_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        let option = Option(
-            class_id=option.class_id,
-            unit_id=option.unit_id,
-            nonce=nonce,
-            strike=option.strike,
-            amount=option.amount,
-            expiration=option.expiration,
-            exponentiation=option.exponentiation,
-            premium=option.premium,
-            created=option.created,
-            writer_address=option.writer_address,
-            buyer_address=option.buyer_address,
-            is_covered=option.is_covered,
-            is_active=FALSE,
-        );
-        options.write(nonce, option);
-        OptionRedeemed.emit(option);
-
-        ReentrancyGuard.finish(nonce);
-
-        return ();
-    }
-
-    func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            class_id: felt, unit_id: felt, nonce: felt, amount: felt
-        ) {
-        Ownable.assert_only_VME();
-
-        let (optio_address: felt) = optio_standard.read();
-        let (vault_address: felt) = optio_vault.read();
-        let (option: Option) = options.read(nonce);
-        let (current_timestamp) = get_block_timestamp();
-
-        with_attr error_message("exercise_option: option is not active") {
-            assert option.is_active = TRUE;
-        }
-
-        let (
-            oracle_price,
-            oracle_decimals,
-            last_updated_timestamp, // UNIX format, in seconds since epoch
-            num_sources_aggregated
-        ) = IEmpiricOracle.get_value(EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE);
-
-        with_attr error_message("exercise_option: out of time constraints") {
-            assert_lt(current_timestamp, last_updated_timestamp + 300); // 5 min window
-        }
-
-        let (buyer_profit, writer_return) = calculate_profit(
-            current_price=oracle_price,
-            strike_price=option.strike,
-            amount=amount,
-            decimals=oracle_decimals,
-        );
-
-        ReentrancyGuard.start(nonce);
-
-        // @notice Sending profits to the buyer
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, buyer_profit);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=vault_address,
-            recipient=option.buyer_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        // @notice Sending remainder to the writer
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, writer_return);
-        IOptio.transferFrom(
-            contract_address=optio_address,
-            sender=vault_address,
-            recipient=option.writer_address,
-            transactions_len=1,
-            transactions=transactions,
-        );
-
-        let option = Option(
-            class_id=option.class_id,
-            unit_id=option.unit_id,
-            nonce=nonce,
-            strike=option.strike,
-            amount=option.amount,
-            expiration=option.expiration,
-            exponentiation=option.exponentiation,
-            premium=option.premium,
-            created=option.created,
-            writer_address=option.writer_address,
-            buyer_address=option.buyer_address,
-            is_covered=option.is_covered,
-            is_active=FALSE,
-        );
-        options.write(nonce, option);
-        OptionExercised.emit(option);
 
         ReentrancyGuard.finish(nonce);
 
