@@ -19,27 +19,6 @@ from contracts.standard.library import Transaction, Values
 from contracts.oracles.empiric import IEmpiricOracle, EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE
 
 
-// @notice Offer data goes into Matching Engine
-// @dev No obligations at this stage
-// @param nonce Unique ID assigned for full lifecycle
-// @param strike Option strike price
-// @param expiration Option expiry in seconds (e.g. 86,400)
-// @param amount Size of the offered position
-// @param writer_address The address of the option seller
-struct Offer {
-    class_id: felt,
-    unit_id: felt,
-    nonce: felt,
-    strike: felt,
-    amount: felt,
-    expiration: felt,
-    exponentiation: felt,
-    created: felt,
-    writer_address: felt,
-    is_matched: felt,
-    is_active: felt,
-}
-
 // @notice Options are being created after matching
 // @dev Transfers should be decorated by ReentrancyGuard
 // @dev Main params are equal to the relevant offer
@@ -62,10 +41,24 @@ struct Option {
 
 struct SmartAccount {
     wallet_address: felt,
-    account_address: felt,
+    address: felt,
     available: felt,
     locked: felt,
     total_balance: felt,
+}
+
+struct Offer {
+    class_id: felt,
+    unit_id: felt,
+    nonce: felt,
+    strike: felt,
+    amount: felt,
+    expiration: felt,
+    exponentiation: felt,
+    created: felt,
+    writer_address: felt,
+    is_matched: felt,
+    is_active: felt,
 }
 
 //
@@ -277,7 +270,7 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, collateral);
         IOptio.transferFrom(
             contract_address=optio_address,
-            sender=option_writer.account_address,
+            sender=option_writer.address,
             recipient=vault_address,
             transactions_len=1,
             transactions=transactions,
@@ -287,8 +280,8 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, premium);
         IOptio.transferFrom(
             contract_address=optio_address,
-            sender=option_buyer.account_address,
-            recipient=option_writer.account_address,
+            sender=option_buyer.address,
+            recipient=option_writer.address,
             transactions_len=1,
             transactions=transactions,
         );
@@ -313,8 +306,8 @@ namespace Options {
             exponentiation=exponentiation,
             premium=premium,
             created=current_timestamp,
-            writer_address=option_writer.account_address,
-            buyer_address=option_buyer.account_address,
+            writer_address=option_writer.address,
+            buyer_address=option_buyer.address,
             is_covered=TRUE,
             is_active=TRUE,
         );
@@ -325,7 +318,7 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, amount);
         IOptio.issue(
             contract_address=optio_address,
-            recipient=option_buyer.account_address,
+            recipient=option_buyer.address,
             transactions_len=1,
             transactions=transactions
         );
