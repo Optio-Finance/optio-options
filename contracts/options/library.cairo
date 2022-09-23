@@ -737,3 +737,15 @@ func calculate_profit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     return (buyer_profit, writer_return);
 }
+
+func felt_to_uint{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        range_check_ptr
+    } (value: felt) -> (value: Uint256) {
+    let (high, low) = split_felt(value);
+    tempvar res: Uint256;
+    res.high = high;
+    res.low = low;
+    return (value=res);
+}
