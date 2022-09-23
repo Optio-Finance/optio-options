@@ -173,14 +173,16 @@ namespace Options {
 
         if (smart_account.address == FALSE) {
             accounts.write(caller_address, SmartAccount(
-                address=caller_address,
+                wallet_address=caller_address,
+                address=caller_address, // TODO smart accounts contract
                 available=amount,
                 locked=0,
                 total_balance=amount,
             ));
         } else {
             accounts.write(caller_address, SmartAccount(
-                address=caller_address,
+                wallet_address=caller_address,
+                address=caller_address, // TODO smart accounts contract
                 available=smart_account.available + amount,
                 locked=smart_account.locked,
                 total_balance=smart_account.total_balance + amount,
@@ -219,7 +221,8 @@ namespace Options {
         }
 
         accounts.write(caller_address, SmartAccount(
-            address=caller_address,
+            wallet_address=caller_address,
+            address=caller_address, // TODO smart accounts contract
             available=smart_account.available - amount,
             locked=smart_account.locked,
             total_balance=smart_account.total_balance - amount,
