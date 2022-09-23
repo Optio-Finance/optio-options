@@ -3,7 +3,8 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE, FALSE
-from starkware.cairo.common.math import assert_not_zero, assert_lt, assert_le, unsigned_div_rem
+from starkware.cairo.common.uint256 import Uint256, uint256_add, uint256_sub, uint256_le, uint256_check
+from starkware.cairo.common.math import assert_not_zero, assert_lt, assert_le, unsigned_div_rem, split_felt
 from starkware.cairo.common.pow import pow
 from starkware.starknet.common.syscalls import (
     get_caller_address,
@@ -154,6 +155,7 @@ namespace Options {
         with_attr error_message("make_deposit: got zero amount") {
             assert_not_zero(amount);
         }
+        let (amount_uint256: Uint256) = felt_to_uint(amount);
         let (caller_address: felt) = get_caller_address();
         let (erc20_address: felt) = underlying.read();
         let (smart_account: SmartAccount) = accounts.read(caller_address);
@@ -162,7 +164,7 @@ namespace Options {
             contract_address=erc20_address,
             sender=caller_address,
             recipient=smart_account.address, // TODO smart accounts contract
-            amount=amount,
+            amount=amount_uint256,
         );
 
         with_attr error_message("make_deposit: deposit operation failed") {
