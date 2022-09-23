@@ -3,7 +3,8 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE, FALSE
-from starkware.cairo.common.math import assert_not_zero, assert_lt, assert_le, unsigned_div_rem
+from starkware.cairo.common.uint256 import Uint256, uint256_add, uint256_sub, uint256_le, uint256_check
+from starkware.cairo.common.math import assert_not_zero, assert_lt, assert_le, unsigned_div_rem, split_felt
 from starkware.cairo.common.pow import pow
 from starkware.starknet.common.syscalls import (
     get_caller_address,
@@ -18,27 +19,6 @@ from contracts.standard.interfaces.IOptio import IOptio
 from contracts.standard.library import Transaction, Values
 from contracts.oracles.empiric import IEmpiricOracle, EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE
 
-
-// @notice Offer data goes into Matching Engine
-// @dev No obligations at this stage
-// @param nonce Unique ID assigned for full lifecycle
-// @param strike Option strike price
-// @param expiration Option expiry in seconds (e.g. 86,400)
-// @param amount Size of the offered position
-// @param writer_address The address of the option seller
-struct Offer {
-    class_id: felt,
-    unit_id: felt,
-    nonce: felt,
-    strike: felt,
-    amount: felt,
-    expiration: felt,
-    exponentiation: felt,
-    created: felt,
-    writer_address: felt,
-    is_matched: felt,
-    is_active: felt,
-}
 
 // @notice Options are being created after matching
 // @dev Transfers should be decorated by ReentrancyGuard
@@ -62,10 +42,24 @@ struct Option {
 
 struct SmartAccount {
     wallet_address: felt,
-    account_address: felt,
+    address: felt,
     available: felt,
     locked: felt,
     total_balance: felt,
+}
+
+struct Offer {
+    class_id: felt,
+    unit_id: felt,
+    nonce: felt,
+    strike: felt,
+    amount: felt,
+    expiration: felt,
+    exponentiation: felt,
+    created: felt,
+    writer_address: felt,
+    is_matched: felt,
+    is_active: felt,
 }
 
 //
@@ -161,6 +155,7 @@ namespace Options {
         with_attr error_message("make_deposit: got zero amount") {
             assert_not_zero(amount);
         }
+        let (amount_uint256: Uint256) = felt_to_uint(amount);
         let (caller_address: felt) = get_caller_address();
         let (erc20_address: felt) = underlying.read();
         let (smart_account: SmartAccount) = accounts.read(caller_address);
@@ -169,7 +164,7 @@ namespace Options {
             contract_address=erc20_address,
             sender=caller_address,
             recipient=smart_account.address, // TODO smart accounts contract
-            amount=amount,
+            amount=amount_uint256,
         );
 
         with_attr error_message("make_deposit: deposit operation failed") {
@@ -178,14 +173,16 @@ namespace Options {
 
         if (smart_account.address == FALSE) {
             accounts.write(caller_address, SmartAccount(
-                address=caller_address,
+                wallet_address=caller_address,
+                address=caller_address, // TODO smart accounts contract
                 available=amount,
                 locked=0,
                 total_balance=amount,
             ));
         } else {
             accounts.write(caller_address, SmartAccount(
-                address=caller_address,
+                wallet_address=caller_address,
+                address=caller_address, // TODO smart accounts contract
                 available=smart_account.available + amount,
                 locked=smart_account.locked,
                 total_balance=smart_account.total_balance + amount,
@@ -224,7 +221,8 @@ namespace Options {
         }
 
         accounts.write(caller_address, SmartAccount(
-            address=caller_address,
+            wallet_address=caller_address,
+            address=caller_address, // TODO smart accounts contract
             available=smart_account.available - amount,
             locked=smart_account.locked,
             total_balance=smart_account.total_balance - amount,
@@ -277,7 +275,7 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, collateral);
         IOptio.transferFrom(
             contract_address=optio_address,
-            sender=option_writer.account_address,
+            sender=option_writer.address,
             recipient=vault_address,
             transactions_len=1,
             transactions=transactions,
@@ -287,8 +285,8 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, premium);
         IOptio.transferFrom(
             contract_address=optio_address,
-            sender=option_buyer.account_address,
-            recipient=option_writer.account_address,
+            sender=option_buyer.address,
+            recipient=option_writer.address,
             transactions_len=1,
             transactions=transactions,
         );
@@ -313,8 +311,8 @@ namespace Options {
             exponentiation=exponentiation,
             premium=premium,
             created=current_timestamp,
-            writer_address=option_writer.account_address,
-            buyer_address=option_buyer.account_address,
+            writer_address=option_writer.address,
+            buyer_address=option_buyer.address,
             is_covered=TRUE,
             is_active=TRUE,
         );
@@ -325,7 +323,7 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, amount);
         IOptio.issue(
             contract_address=optio_address,
-            recipient=option_buyer.account_address,
+            recipient=option_buyer.address,
             transactions_len=1,
             transactions=transactions
         );
@@ -743,4 +741,16 @@ func calculate_profit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let writer_return = amount - buyer_profit;
 
     return (buyer_profit, writer_return);
+}
+
+func felt_to_uint{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        range_check_ptr
+    } (value: felt) -> (value: Uint256) {
+    let (high, low) = split_felt(value);
+    tempvar res: Uint256;
+    res.high = high;
+    res.low = low;
+    return (value=res);
 }

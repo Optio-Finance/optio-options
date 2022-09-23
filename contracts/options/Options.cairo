@@ -21,6 +21,22 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 //
 
 @external
+func makeDeposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        amount: felt
+    ) {
+    Options.make_deposit(amount);
+    return ();
+}
+
+@external
+func makeWithdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        amount: felt
+    ) {
+    Options.make_withdraw(amount);
+    return ();
+}
+
+@external
 func createOffer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         class_id: felt, strike: felt, amount: felt, expiration: felt,
     ) {
