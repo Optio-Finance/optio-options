@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from contracts.options.library import Options, Values
+from contracts.options.library import SmartAccount, Options, Values
 
 
 //
@@ -33,6 +33,40 @@ func makeWithdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         amount: felt
     ) {
     Options.make_withdraw(amount);
+    return ();
+}
+
+@external
+func tradeOption{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        class_id: felt,
+        strike: felt,
+        amount: felt,
+        expiration: felt,
+        exponentiation: felt,
+        option_writer: SmartAccount,
+        option_buyer: SmartAccount,
+        collateral: felt,
+        premium: felt,
+        metadata_ids_len: felt,
+        metadata_ids: felt*,
+        values_len: felt,
+        values: Values*,
+    ) {
+    Options.trade_option(
+        class_id,
+        strike,
+        amount,
+        expiration,
+        exponentiation,
+        option_writer,
+        option_buyer,
+        collateral,
+        premium,
+        metadata_ids_len,
+        metadata_ids,
+        values_len,
+        values,
+    );
     return ();
 }
 
