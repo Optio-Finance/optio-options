@@ -254,6 +254,7 @@ namespace Options {
             values_len: felt,
             values: Values*,
         ) {
+        alloc_locals;
         Ownable.assert_only_VME();
 
         with_attr error_message("create_offer: got zero inputs lengths") {
@@ -270,7 +271,7 @@ namespace Options {
         ReentrancyGuard.start(nonce);
 
         let (prev_unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
-        let unit_id = prev_unit_id + 1;
+        local unit_id = prev_unit_id + 1;
 
         let (transactions: Transaction*) = alloc();
         assert transactions[0] = Transaction(class_id, unit_id, collateral);
@@ -340,11 +341,12 @@ namespace Options {
     func exercise_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, unit_id: felt, nonce: felt, amount: felt
         ) {
+        alloc_locals;
         Ownable.assert_only_VME();
 
-        let (optio_address: felt) = optio_standard.read();
-        let (vault_address: felt) = optio_vault.read();
-        let (option: Option) = options.read(nonce);
+        let (local optio_address: felt) = optio_standard.read();
+        let (local vault_address: felt) = optio_vault.read();
+        let (local option: Option) = options.read(nonce);
         let (current_timestamp) = get_block_timestamp();
 
         with_attr error_message("exercise_option: option is not active") {
@@ -420,9 +422,10 @@ namespace Options {
     func redeem_option{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, unit_id: felt, nonce: felt
         ) {
+        alloc_locals;
         Ownable.assert_only_VME();
 
-        let (option: Option) = options.read(nonce);
+        let (local option: Option) = options.read(nonce);
         let (current_timestamp: felt) = get_block_timestamp();
 
         with_attr error_message("redeem_option: option has been set inactive") {
@@ -477,6 +480,7 @@ namespace Options {
     func create_offer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             class_id: felt, strike: felt, amount: felt, expiration: felt,
         ) {
+        alloc_locals;
         with_attr error_message("create_offer: details could not be zeros") {
             assert_not_zero(strike);
             assert_not_zero(amount);
@@ -490,7 +494,7 @@ namespace Options {
         let (caller_address: felt) = get_caller_address();
         let (optio_address: felt) = optio_standard.read();
         let (pool_address: felt) = optio_pool.read();
-        let (unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
+        let (local unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
 
         // @dev The batch here always contains a single micro-transaction
         // @dev But in practice a batch can contain hundreds of micro-transactions
