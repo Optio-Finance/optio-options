@@ -343,6 +343,12 @@ namespace Options {
         ) {
         alloc_locals;
         Ownable.assert_only_VME();
+        let (
+            oracle_price,
+            oracle_decimals,
+            last_updated_timestamp, // UNIX format, in seconds since epoch
+            num_sources_aggregated
+        ) = IEmpiricOracle.get_value(EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE);
 
         let (local optio_address: felt) = optio_standard.read();
         let (local vault_address: felt) = optio_vault.read();
@@ -352,13 +358,6 @@ namespace Options {
         with_attr error_message("exercise_option: option is not active") {
             assert option.is_active = TRUE;
         }
-
-        let (
-            oracle_price,
-            oracle_decimals,
-            last_updated_timestamp, // UNIX format, in seconds since epoch
-            num_sources_aggregated
-        ) = IEmpiricOracle.get_value(EMPIRIC_ORACLE_ADDRESS, PAIR, AGGREGATION_MODE);
 
         with_attr error_message("exercise_option: out of time constraints") {
             assert_lt(current_timestamp, last_updated_timestamp + 300); // 5 min window
