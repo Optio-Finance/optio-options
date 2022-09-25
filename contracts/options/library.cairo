@@ -198,6 +198,7 @@ namespace Options {
     func make_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
             amount: felt
         ) {
+        let (amount_uint256: Uint256) = felt_to_uint(amount);
         let (caller_address: felt) = get_caller_address();
         let (erc20_address: felt) = underlying.read();
         let (smart_account: SmartAccount) = accounts.read(caller_address);
@@ -213,7 +214,7 @@ namespace Options {
             contract_address=erc20_address,
             sender=smart_account.address, // TODO smart accounts contract
             recipient=caller_address,
-            amount=amount,
+            amount=amount_uint256,
         );
 
         with_attr error_message("withdraw_deposit: transfer failed") {
