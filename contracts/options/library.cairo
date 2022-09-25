@@ -190,7 +190,7 @@ namespace Options {
         }
 
         let (updated_account: SmartAccount) = accounts.read(caller_address);
-        DepositMade(updated_account);
+        DepositMade.emit(updated_account);
         
         return ();
     }
@@ -230,7 +230,7 @@ namespace Options {
         ));
 
         let (updated_account: SmartAccount) = accounts.read(caller_address);
-        DepositWithdrawn(updated_account);
+        DepositWithdrawn.emit(updated_account);
 
         return ();
     }
