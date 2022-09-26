@@ -178,7 +178,7 @@ namespace OPTIO {
         );
 
         with_attr error_message(
-                "_transfer_from: not enough funds to transfer, got sender's balance {balance_sender}") {
+                "transfer_from_batch: not enough funds to transfer, got sender's balance {balance_sender}") {
             assert_le(balance_sender, transaction.amount);
         }
 
