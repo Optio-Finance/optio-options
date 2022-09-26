@@ -142,6 +142,25 @@ namespace OPTIO {
     }
 
     func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+            class_id: felt, unit_id: felt, sender: felt, recipient: felt, amount: felt
+        ) {
+
+        let (balance_sender) = balances.read(sender, class_id, unit_id);
+        let (balance_recipient) = balances.read(recipient, class_id, unit_id);
+
+        with_attr error_message(
+                "transfer_from: not enough funds to transfer, got sender's balance {balance_sender}") {
+            assert_le(balance_sender, amount);
+        }
+
+        // @dev subtracting from a sender and adding to a recipient
+        balances.write(sender, class_id, unit_id, balance_sender - amount);
+        balances.write(recipient, class_id, unit_id, balance_recipient + amount);
+
+        return ();
+    }
+
+    func transfer_from_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         sender: felt,
         recipient: felt,
         transaction_index: felt,
