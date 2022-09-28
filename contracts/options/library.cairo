@@ -273,14 +273,13 @@ namespace Options {
         let (prev_unit_id: felt) = IOptio.getLatestUnit(contract_address=optio_address, class_id=class_id);
         local unit_id = prev_unit_id + 1;
 
-        let (transactions: Transaction*) = alloc();
-        assert transactions[0] = Transaction(class_id, unit_id, collateral);
         IOptio.transferFrom(
             contract_address=optio_address,
+            class_id=class_id,
+            unit_id=unit_id,
             sender=option_writer.address,
             recipient=vault_address,
-            transactions_len=1,
-            transactions=transactions,
+            amount=collateral
         );
 
         let (transactions: Transaction*) = alloc();
