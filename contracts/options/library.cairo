@@ -160,17 +160,6 @@ namespace Options {
         let (erc20_address: felt) = underlying.read();
         let (smart_account: SmartAccount) = accounts.read(caller_address);
 
-        let (deposit_success: felt) = IERC20.transferFrom(
-            contract_address=erc20_address,
-            sender=caller_address,
-            recipient=smart_account.address, // TODO smart accounts contract
-            amount=amount_uint256,
-        );
-
-        with_attr error_message("make_deposit: deposit operation failed") {
-            assert deposit_success = TRUE;
-        }
-
         if (smart_account.address == FALSE) {
             accounts.write(caller_address, SmartAccount(
                 wallet_address=caller_address,
@@ -187,6 +176,17 @@ namespace Options {
                 locked=smart_account.locked,
                 total_balance=smart_account.total_balance + amount,
             ));
+        }
+
+        let (deposit_success: felt) = IERC20.transferFrom(
+            contract_address=erc20_address,
+            sender=caller_address,
+            recipient=smart_account.address, // TODO smart accounts contract
+            amount=amount_uint256,
+        );
+
+        with_attr error_message("make_deposit: deposit operation failed") {
+            assert deposit_success = TRUE;
         }
 
         let (updated_account: SmartAccount) = accounts.read(caller_address);
