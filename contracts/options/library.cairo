@@ -177,9 +177,8 @@ namespace Options {
             ));
         }
 
-        let (deposit_success: felt) = IERC20.transferFrom(
+        let (deposit_success: felt) = IERC20.transfer(
             contract_address=erc20_address,
-            sender=caller_address,
             recipient=pool_address,
             amount=amount_uint256,
         );
