@@ -199,6 +199,7 @@ namespace Options {
         let (amount_uint256: Uint256) = felt_to_uint(amount);
         let (caller_address: felt) = get_caller_address();
         let (erc20_address: felt) = underlying.read();
+        let (pool_address: felt) = optio_pool.read();
         let (smart_account: SmartAccount) = accounts.read(caller_address);
 
         with_attr error_message("make_deposit: zero inputs or smart_account={smart_account}") {
@@ -210,7 +211,7 @@ namespace Options {
 
         let (withdrawal_success: felt) = IERC20.transferFrom(
             contract_address=erc20_address,
-            sender=smart_account.address, // TODO smart accounts contract
+            sender=pool_address,
             recipient=caller_address,
             amount=amount_uint256,
         );
