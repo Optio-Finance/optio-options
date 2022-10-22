@@ -5,6 +5,12 @@
 @contract_interface
 namespace IOptions {
 
+    func makeDeposit(amount: felt) {
+    }
+
+    func makeWithdraw(amount: felt) {
+    }
+
     // @notice Allows to create offers (asks) to be consumed by ME
     // @param strike The strike price for underlying asset
     // @param amount The size of the ask
