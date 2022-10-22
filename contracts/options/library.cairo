@@ -140,11 +140,12 @@ namespace Options {
     /// Constructor
     //
     func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-            optio_address: felt, pool_address: felt, class_id: felt, erc20_address: felt
+            optio_address: felt, erc20_address: felt, pool_address: felt, vault_address: felt, class_id: felt,
         ) {
         optio_standard.write(optio_address);
-        optio_pool.write(pool_address);
         underlying.write(erc20_address);
+        optio_pool.write(pool_address);
+        optio_vault.write(vault_address);
         class.write(class_id);
         return ();
     }
