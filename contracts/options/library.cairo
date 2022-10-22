@@ -42,7 +42,6 @@ struct Option {
 
 struct SmartAccount {
     wallet_address: felt,
-    address: felt,
     available: felt,
     locked: felt,
     total_balance: felt,
@@ -223,7 +222,6 @@ namespace Options {
 
         accounts.write(caller_address, SmartAccount(
             wallet_address=caller_address,
-            address=caller_address, // TODO smart accounts contract
             available=smart_account.available - amount,
             locked=smart_account.locked,
             total_balance=smart_account.total_balance - amount,
