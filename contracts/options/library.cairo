@@ -159,12 +159,12 @@ namespace Options {
         let (amount_uint256: Uint256) = felt_to_uint(amount);
         let (caller_address: felt) = get_caller_address();
         let (erc20_address: felt) = underlying.read();
+        let (pool_address: felt) = optio_pool.read();
         let (smart_account: SmartAccount) = accounts.read(caller_address);
 
         if (smart_account.address == FALSE) {
             accounts.write(caller_address, SmartAccount(
                 wallet_address=caller_address,
-                address=caller_address, // TODO smart accounts contract
                 available=amount,
                 locked=0,
                 total_balance=amount,
@@ -172,7 +172,6 @@ namespace Options {
         } else {
             accounts.write(caller_address, SmartAccount(
                 wallet_address=caller_address,
-                address=caller_address, // TODO smart accounts contract
                 available=smart_account.available + amount,
                 locked=smart_account.locked,
                 total_balance=smart_account.total_balance + amount,
@@ -182,7 +181,7 @@ namespace Options {
         let (deposit_success: felt) = IERC20.transferFrom(
             contract_address=erc20_address,
             sender=caller_address,
-            recipient=smart_account.address, // TODO smart accounts contract
+            recipient=pool_address,
             amount=amount_uint256,
         );
 
