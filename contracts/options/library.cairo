@@ -161,7 +161,7 @@ namespace Options {
         let (pool_address: felt) = optio_pool.read();
         let (smart_account: SmartAccount) = accounts.read(caller_address);
 
-        if (smart_account.address == FALSE) {
+        if (smart_account.wallet_address == FALSE) {
             accounts.write(caller_address, SmartAccount(
                 wallet_address=caller_address,
                 available=amount,
@@ -204,7 +204,7 @@ namespace Options {
 
         with_attr error_message("make_deposit: zero inputs or smart_account={smart_account}") {
             assert_not_zero(amount);
-            assert_not_zero(smart_account.address);
+            assert_not_zero(smart_account.wallet_address);
             assert_le(amount, smart_account.available);
             assert_le(amount, smart_account.total_balance);
         }
@@ -284,8 +284,8 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, premium);
         IOptio.transferFrom(
             contract_address=optio_address,
-            sender=option_buyer.address,
-            recipient=option_writer.address,
+            sender=option_buyer.wallet_address,
+            recipient=option_writer.wallet_address,
             transactions_len=1,
             transactions=transactions,
         );
@@ -310,8 +310,8 @@ namespace Options {
             exponentiation=exponentiation,
             premium=premium,
             created=current_timestamp,
-            writer_address=option_writer.address,
-            buyer_address=option_buyer.address,
+            writer_address=option_writer.wallet_address,
+            buyer_address=option_buyer.wallet_address,
             is_covered=TRUE,
             is_active=TRUE,
         );
@@ -322,7 +322,7 @@ namespace Options {
         assert transactions[0] = Transaction(class_id, unit_id, amount);
         IOptio.issue(
             contract_address=optio_address,
-            recipient=option_buyer.address,
+            recipient=option_buyer.wallet_address,
             transactions_len=1,
             transactions=transactions
         );
