@@ -10,9 +10,9 @@ from contracts.options.library import SmartAccount, Options, Values
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        optio_address: felt, class_id: felt, pool_address: felt, erc20_address: felt
+        optio_address: felt, erc20_address: felt, pool_address: felt, vault_address: felt, class_id: felt
     ) {
-    Options.initialize(optio_address, class_id, pool_address, erc20_address);
+    Options.initialize(optio_address, erc20_address, pool_address, vault_address, class_id);
     return ();
 }
 
