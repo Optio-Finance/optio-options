@@ -233,6 +233,19 @@ namespace Options {
         return ();
     }
 
+    func matching_vme{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        recipient: felt, amount: felt
+    ) {
+        let (smart_account: SmartAccount) = accounts.read(recipient);
+        accounts.write(recipient, SmartAccount(
+            wallet_address=recipient,
+            available=smart_account.available + amount,
+            locked=smart_account.locked,
+            total_balance=smart_account.total_balance + amount,
+        ));
+        return ();
+    }
+
     //
     // Option instance methods
     //
